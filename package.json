@@ -1,0 +1,8 @@
+{
+  "name": "dj-presskit",
+  "version": "1.0.0",
+  "description": "Modular DJ presskit template",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
