@@ -43,6 +43,15 @@ Todo se guarda en el `localStorage` del navegador, así que cada persona que abr
 
 Activá **"Gráficos de fondo"** en el diálogo, si no se pierden las fotos, el grano y el foil.
 
+## Deploy de un click
+
+Sitio estático puro, sin build. Cualquiera de estos botones clona el repo en tu cuenta y lo deja online:
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/solocachengue/djpresskit)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsolocachengue%2Fdjpresskit)
+
+El botón te pide autorizar GitHub, hace un fork a tu cuenta y despliega. Después, cada push a ese fork redeploya solo.
+
 ## Correrlo local
 
 Necesita un servidor HTTP: los `.jsx` se transpilan en el navegador con Babel y no cargan por `file://`.

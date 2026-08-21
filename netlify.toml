@@ -1,0 +1,10 @@
+# Sitio estático sin build: los .jsx se transpilan en el navegador con Babel.
+# Declarado explícitamente para que el deploy de un click no intente adivinar
+# un paso de build que no existe.
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
