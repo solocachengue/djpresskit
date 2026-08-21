@@ -235,6 +235,20 @@
   .ds-social-rail { display:flex; flex-direction:column; align-items:center; }
   .ds-icon { display:inline-block; flex:0 0 auto; background-color:var(--accent); }
 
+  /* Decorative overlays: protection scrims, the torn-paper wedge, the copper
+     edge bar. They are painted above the full-bleed photo slots, so without
+     this they swallow the click that opens the file picker and the photo
+     underneath becomes impossible to replace. Nothing here is interactive. */
+  .deco { pointer-events:none; }
+
+  /* Content layers are stretched across the whole spread (inset:0) to position
+     their columns, so as solid hit targets they would blanket the full-bleed
+     photo slot underneath and make it unclickable everywhere, not just where
+     the text is. The layer itself is transparent to the pointer; only the
+     leaves that are actually interactive take clicks back. */
+  .layer { pointer-events:none; }
+  .layer :is([contenteditable], a, button, input, label, .upload) { pointer-events:auto; }
+
   /* ══════════════ EDITING ══════════════ */
   [contenteditable="true"] { outline:none; }
   [contenteditable="true"]:hover { box-shadow:inset 0 -1px 0 0 var(--accent-quiet); }

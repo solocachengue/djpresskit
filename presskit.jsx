@@ -123,7 +123,8 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
   } : {};
 
   return (
-    <div className={`upload ${className} ${src ? "has-image" : ""} ${isImgMode ? "is-prop" : ""} ${tone === "paper" ? "on-paper" : ""}`}
+    <div data-slot={id}
+      className={`upload ${className} ${src ? "has-image" : ""} ${isImgMode ? "is-prop" : ""} ${tone === "paper" ? "on-paper" : ""}`}
       style={{ ...style, ...bg, "--image-opacity": opacity }}
       onClick={() => inputRef.current && inputRef.current.click()}>
       <input ref={inputRef} type="file" accept="image/*" onChange={onPick} />
@@ -216,16 +217,16 @@ function SpreadCover({ wordmark, editing }) {
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="cv-hero" editing={editing} optional
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
-      <span style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
+      <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
       <div className="grain" />
 
-      <div style={{ position: "absolute", top: 54, left: 110, right: 110, zIndex: 4,
+      <div className="layer" style={{ position: "absolute", top: 54, left: 110, right: 110, zIndex: 4,
                     display: "flex", justifyContent: "space-between" }}>
         <Eyebrow tone="on-stage" size={11}><Editable id="cv-kicker" fallback="Press Kit" /></Eyebrow>
         <Eyebrow tone="on-stage" size={11}><Editable id="cv-year" fallback="2026" /></Eyebrow>
       </div>
 
-      <div style={{ position: "absolute", inset: 0, zIndex: 3, display: "flex",
+      <div className="layer" style={{ position: "absolute", inset: 0, zIndex: 3, display: "flex",
                     flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
         <ImageSlot id="cv-prop" editing={editing} mode="img" fit="contain" optional
           filter="drop-shadow(0 24px 60px rgba(0,0,0,.45))"
@@ -235,7 +236,7 @@ function SpreadCover({ wordmark, editing }) {
         </Wordmark>
       </div>
 
-      <div style={{ position: "absolute", bottom: 54, left: 110, right: 110, zIndex: 4,
+      <div className="layer" style={{ position: "absolute", bottom: 54, left: 110, right: 110, zIndex: 4,
                     display: "flex", justifyContent: "space-between" }}>
         <Eyebrow tone="on-stage" size={11}><Editable id="cv-foot-left" fallback="Eskay Da Real" /></Eyebrow>
         <Eyebrow tone="on-stage" size={11}><Editable id="cv-foot-right" fallback="Music Producer" /></Eyebrow>
@@ -253,7 +254,7 @@ function SpreadStory({ editing }) {
   return (
     <div className="spread" style={{ background: "var(--paper-100)" }}>
       <div className="grain grain--paper" />
-      <div style={{ position: "absolute", inset: 0, display: "grid",
+      <div className="layer" style={{ position: "absolute", inset: 0, display: "grid",
                     gridTemplateColumns: "1fr 1.05fr", alignItems: "center",
                     padding: "0 0 0 110px", gap: 60, zIndex: 3 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
@@ -291,7 +292,7 @@ function SpreadSocial({ editing }) {
       <ImageSlot id="so-portrait" editing={editing}
         filter="var(--filter-bw)" objectPosition="28% 20%"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
-      <span style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
+      <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
       <GhostWord size={230} opacity={.1} style={{ top: "52%", textAlign: "center", transform: "translateY(-50%)" }}>
         <Editable id="so-ghost" fallback="socialmedia" />
       </GhostWord>
@@ -314,7 +315,7 @@ function SpreadMusic({ editing }) {
       <div className="grain" />
       <ImageSlot id="mu-spray" editing={editing} mode="img" fit="contain" optional
         style={{ position: "absolute", left: 470, top: 60, width: 130, height: 280, opacity: .9, zIndex: 2 }} />
-      <div style={{ position: "absolute", inset: 0, display: "grid",
+      <div className="layer" style={{ position: "absolute", inset: 0, display: "grid",
                     gridTemplateColumns: "1fr 1.5fr", alignItems: "center",
                     padding: "0 0 0 110px", gap: 40, zIndex: 3 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 44,
@@ -338,7 +339,7 @@ function SpreadMusic({ editing }) {
             style={{ position: "absolute", left: 40, top: "50%", transform: "translateY(-50%)",
                      width: 330, height: 330, background: "var(--ink-900)",
                      boxShadow: "var(--shadow-photo)", zIndex: 3 }}>
-            <span style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 3 }} />
+            <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 3 }} />
             <div style={{ position: "absolute", left: 22, bottom: 22, zIndex: 4 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
                 <Editable id="mu-handle" fallback="@eskaydareal" />
@@ -367,7 +368,7 @@ function SpreadSkills({ editing }) {
       <ImageSlot id="sk-prop" editing={editing} mode="img" fit="contain" optional tone="paper"
         style={{ position: "absolute", right: 70, top: "46%", transform: "translateY(-50%)",
                  width: 460, height: 320, zIndex: 2 }} />
-      <div style={{ position: "absolute", inset: 0, padding: "0 0 0 110px", width: 620,
+      <div className="layer" style={{ position: "absolute", inset: 0, padding: "0 0 0 110px", width: 620,
                     display: "flex", flexDirection: "column", justifyContent: "center",
                     gap: 48, zIndex: 3 }}>
         <div className="ds-heading">
@@ -379,7 +380,7 @@ function SpreadSkills({ editing }) {
             ruleWidth={0} gap={16} editing={editing} addLabel="Agregar credencial" />
         </div>
       </div>
-      <div style={{ position: "absolute", left: 110, bottom: 60, zIndex: 4,
+      <div className="layer" style={{ position: "absolute", left: 110, bottom: 60, zIndex: 4,
                     display: "flex", alignItems: "flex-end", gap: 26 }}>
         <ImageSlot id="sk-logo1" editing={editing} mode="img" tone="paper" fit="contain"
           objectPosition="bottom left" style={{ width: 74, height: 74 }} />
@@ -403,9 +404,9 @@ function SpreadTrust({ editing }) {
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="tr-photo" editing={editing} filter="var(--filter-bw)"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
-      <span style={{ position: "absolute", inset: 0, background: "rgba(8,7,7,.66)", zIndex: 1 }} />
+      <span className="deco" style={{ position: "absolute", inset: 0, background: "rgba(8,7,7,.66)", zIndex: 1 }} />
       <div className="grain" />
-      <div style={{ position: "absolute", inset: 0, padding: "0 90px 0 110px", display: "flex",
+      <div className="layer" style={{ position: "absolute", inset: 0, padding: "0 90px 0 110px", display: "flex",
                     flexDirection: "column", justifyContent: "center", gap: 38, zIndex: 4 }}>
         <div className="ds-heading">
           <DisplayTitle size={62}><Editable id="tr-title" fallback="they trust" /></DisplayTitle>
@@ -444,25 +445,25 @@ function SpreadBack({ wordmark, editing }) {
       <ImageSlot id="bk-photo" editing={editing}
         filter="var(--filter-warm) brightness(.9)" objectPosition="46% 30%"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
-      <span style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 1 }} />
+      <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 1 }} />
       <GhostWord size={190} opacity={.14} style={{ top: "50%", transform: "translateY(-50%)", left: 60 }}>
         <Editable id="bk-ghost" fallback={wordmark} />
       </GhostWord>
 
       {/* Torn paper: the source is a photographed torn edge; this is a straight
           diagonal clip standing in for it. */}
-      <div style={{ position: "absolute", inset: 0, background: "var(--paper-100)",
+      <div className="deco" style={{ position: "absolute", inset: 0, background: "var(--paper-100)",
                     clipPath: "polygon(0 0,34% 0,17% 100%,0 100%)", opacity: .96, zIndex: 2 }}>
         <span style={{ position: "absolute", inset: 0, backgroundImage: "url(assets/texture-paper-light.png)",
                        backgroundSize: "400px", opacity: .5, mixBlendMode: "multiply" }} />
       </div>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 34,
+      <div className="deco" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 34,
                     background: "var(--copper-700)", opacity: .85, zIndex: 3 }} />
       <div className="grain" />
 
       {/* The paper wedge is only ~185px wide at the foot once the copper bar is
           clear of it, so the contact drops to label tracking to fit inside it. */}
-      <div style={{ position: "absolute", left: 54, bottom: 44, zIndex: 5, width: 170 }}>
+      <div className="layer" style={{ position: "absolute", left: 54, bottom: 44, zIndex: 5, width: 170 }}>
         <div className="ds-eyebrow on-paper"
           style={{ fontSize: 9, letterSpacing: "var(--ls-label)", lineHeight: 1.7, wordBreak: "break-word" }}>
           <Editable id="bk-foot" fallback="eskaydareal@gmail.com" />
