@@ -1,64 +1,80 @@
-# DJ Presskit Template
+# Eskay Da Real — Press Kit Template
 
-Presskit modular para DJs — 6 páginas editables (Cover, Bio, Live, Music, Press, Rider) + 10 páginas opcionales (Discography, Manifesto, Festivals, Services, Timeline, Tour Map, Brands, Radio, Streaming, Contact). 20 templates predefinidos, selector de tipografía, exportá a PDF con un click.
+Press kit de DJ construido sobre el design system de **Eskay Da Real**: copper foil estampado sobre negro, atravesado por grano de película. Siete spreads apaisados (1280×655, el ratio de los artboards originales), todos editables en el navegador y exportables a PDF.
+
+Un solo diseño. Lo que cambia es el contenido.
+
+## Los siete spreads
+
+| # | Spread | Qué es |
+|---|---|---|
+| 01 | Cover | Wordmark en foil, prop flotante, footline tracked |
+| 02 | Story / About | Fondo papel, bio justificada con guionado, retrato cálido |
+| 03 | Social Media | Retrato b&n a sangre, wordmark fantasma, fila de contacto |
+| 04 | Music / Style | Índice numerado de géneros, cover art, vinilo |
+| 05 | Degree & Skills | Credenciales numeradas, logos de partners, rail de redes |
+| 06 | They Trust | Índice de venues a dos columnas sobre foto de venue |
+| 07 | Back Cover | Collage de papel rasgado en diagonal, wordmark fantasma |
+
+Podés reordenarlos, sacarlos o repetirlos desde **☰ Spreads**.
+
+## Los dos presets de contenido
+
+El botón **◆ Contenido** cambia el contenido, no el diseño:
+
+- **Eskay Da Real** — el kit original, con sus fotos, props y copy.
+- **Hardwell** — el mismo sistema cargado con otro artista. **Viene sin fotos a propósito**: no existen assets de Hardwell, así que todos los slots de imagen abren vacíos como drop zones. Sirve para ver que el sistema aguanta cualquier contenido y que todo se reemplaza.
+
+Cargar un preset reemplaza textos y listas. Las fotos que subiste se mantienen.
+
+## Todo es editable
+
+- **Textos** — click en cualquier texto con el modo **✎ Editar** activo. Títulos, eyebrows, bio, handles, footlines.
+- **Listas numeradas** — géneros, credenciales y venues se agregan, editan y borran fila por fila.
+- **Imágenes** — *todas*. No hay ninguna imagen soldada al layout: retratos, cover art, foto de venue, y también los props de marca (auriculares, vinilo, sticker die-cut, sprays de spray-paint, logos de partners). Click en cualquiera para reemplazarla, `◐` para regular el brillo, `✕` para vaciarla.
+
+Los props que quedan vacíos simplemente desaparecen del spread — nunca sale un placeholder punteado en el PDF.
+
+Todo se guarda en el `localStorage` del navegador, así que cada persona que abre el sitio tiene su propia versión.
+
+## Exportar a PDF
+
+**↓ PDF** abre el diálogo de impresión. La página está definida en 338×173mm — el mismo ratio 1.954:1 que los spreads — así que cada spread sale a página completa sin bandas.
+
+Activá **"Gráficos de fondo"** en el diálogo, si no se pierden las fotos, el grano y el foil.
+
+## Correrlo local
+
+Necesita un servidor HTTP: los `.jsx` se transpilan en el navegador con Babel y no cargan por `file://`.
+
+```bash
+python3 -m http.server 8000    # y abrí http://localhost:8000
+```
+
+O `npm start`, que corre `npx serve .`.
 
 ## Archivos
 
-- `index.html` — entry point. Contiene todo el CSS + monta los scripts JSX.
-- `presskit.jsx` — componente principal + 6 páginas core (Cover, Bio, Live, Music, Press, Rider).
-- `pages-extra.jsx` — 10 páginas opcionales adicionales.
-- `templates.jsx` — los 20 templates (estructura + paleta + tipografía).
-- `tweaks-panel.jsx` — panel de Tweaks reutilizable.
+- `index.html` — entry point: tokens del design system en CSS, layout de spreads, reglas de impresión.
+- `design-system.jsx` — primitivas de marca (Wordmark, DisplayTitle, Eyebrow, GhostWord, IndexRow, SocialRow/Rail, Icon), inventario de spreads y los dos presets de contenido.
+- `presskit.jsx` — los siete spreads, la infraestructura de edición y la app.
+- `tweaks-panel.jsx` — panel flotante de ajustes.
+- `assets/` — fotos, props y texturas del kit original.
 
-## Cómo correrlo localmente
+## El design system, en corto
 
-Necesita un servidor HTTP (los scripts JSX no se cargan abriendo el archivo directo por `file://`).
+Las reglas que hacen que esto se vea como se ve, por si agregás spreads:
 
-**Opción A — Python (en cualquier Mac/Linux ya viene):**
-```bash
-cd proyecto
-python3 -m http.server 8000
-```
-Después abrí `http://localhost:8000` en tu navegador.
+- **Color.** Monocromo más un solo tono: la rampa copper (`#E8926A` en el centro). Todo lo demás es tinta (`#0C0B0B`) o papel (`#F4F3F1`). El copper aparece solo en títulos, numerales y reglas de índice, e íconos — nunca como relleno grande ni fondo. Los fondos alternan **stage** (negro) y **paper** (crudo); nunca se mezclan en una misma superficie.
+- **Tipografía.** Una sola grotesca geométrica en extremos. Display: minúscula siempre, peso 800, tracking `-.03em`, enorme. Eyebrow: MAYÚSCULA, peso 300, tracking `.42em`. Sin serif, sin mono, sin itálica.
+- **Listas.** Toda lista de más de dos cosas es un índice numerado: `01.` con punto, y una regla copper hasta la etiqueta.
+- **Fondos.** Nunca planos: siempre grano de película sobre negro (50%) o papel (28%).
+- **Formas.** Radio 0 por defecto. Lo único redondo es lo que es redondo de verdad: el vinilo, el sticker, los badges de íconos.
+- **Sombras.** Solo exteriores, grandes y suaves — sombra de objeto apoyado sobre una mesa, no jerarquía de UI.
+- **Sin emoji. Sin ilustración vectorial.** El kit original no tiene ninguno de los dos.
 
-**Opción B — Node:**
-```bash
-npx serve proyecto
-```
+> **Nota de tipografía:** el kit original no venía con los binarios de la fuente. Va **Figtree** (Google Fonts) como el match libre más cercano a la grotesca geométrica del original. Se cambia en una línea, en el `<link>` de `index.html` y en `--font-display`.
 
-**Opción C — VS Code:** instalá la extensión "Live Server" → click derecho en `index.html` → "Open with Live Server".
+## Créditos y assets
 
-## Deploy a Vercel
-
-1. Subí esta carpeta entera a un repo de GitHub.
-2. Andá a [vercel.com/new](https://vercel.com/new) e importá el repo.
-3. Vercel detecta que es un sitio estático y deploya automáticamente.
-4. URL gratis, HTTPS, deploy en cada push.
-
-**Sin GitHub** → instalá Vercel CLI y ejecutá:
-```bash
-npm i -g vercel
-cd proyecto
-vercel
-```
-
-## Deploy a Netlify (alternativa)
-
-Andá a [app.netlify.com/drop](https://app.netlify.com/drop) y arrastrá la carpeta. Listo.
-
-## Editar el código
-
-Los archivos `.jsx` se transpilan en el navegador con Babel (perfecto para prototipos / templates como este). Editás el archivo, refrescás, ves el cambio.
-
-Para producción a gran escala conviene precompilar con un bundler (Vite, esbuild) — pero para este caso de uso (un presskit personal), no hace falta.
-
-## Personalizar
-
-- Los datos editables se guardan en `localStorage` del navegador. Cada DJ que use el presskit tiene los suyos.
-- Los 20 templates están en `templates.jsx` — agregá los tuyos copiando una entrada existente.
-- Los tipos de página están en `pages-extra.jsx` (los nuevos) y `presskit.jsx` (los core).
-- Las fuentes de Google Fonts se importan en `index.html`.
-
-## Licencia
-
-Tuyo. Hacé lo que quieras.
+Las fotos, props y texturas de `assets/` vienen del press kit de Eskay Da Real y son material suyo. Si vas a usar este template para otro artista, reemplazalos — para eso todos los slots son editables.
