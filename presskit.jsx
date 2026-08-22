@@ -24,6 +24,9 @@ const K = {
   venues:  "eskay.venues.v1",
   social:  "eskay.social.v1",
   preset:  "eskay.preset.v1",
+  accent:  "eskay.accent.v1",
+  texture: "eskay.texture.v1",
+  grain:   "eskay.grain.v1",
 };
 
 const loadJSON = (k, f) => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : f; } catch { return f; } };
@@ -454,7 +457,7 @@ function SpreadBack({ wordmark, editing }) {
           diagonal clip standing in for it. */}
       <div className="deco" style={{ position: "absolute", inset: 0, background: "var(--paper-100)",
                     clipPath: "polygon(0 0,34% 0,17% 100%,0 100%)", opacity: .96, zIndex: 2 }}>
-        <span style={{ position: "absolute", inset: 0, backgroundImage: "url(assets/texture-paper-light.png)",
+        <span style={{ position: "absolute", inset: 0, backgroundImage: "var(--grain-light)",
                        backgroundSize: "400px", opacity: .5, mixBlendMode: "multiply" }} />
       </div>
       <div className="deco" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 34,
@@ -511,6 +514,101 @@ function PresetModal({ open, onClose, currentId }) {
               </div>
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The hue, the film stock and the deploy links live here rather than in the
+// Tweaks panel: that panel only opens when an embedding host activates it, so
+// on the published site it never appears and its controls are unreachable.
+function StyleModal({ open, onClose, accent, setAccent, texture, setTexture, grain, setGrain }) {
+  if (!open) return null;
+  const ramp = window.buildRamp(accent);
+  const t = window.TEXTURES;
+
+  const NetlifyMark = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 1.3 22.7 12 12 22.7 1.3 12 12 1.3zm0 3.1L4.4 12l7.6 7.6 7.6-7.6L12 4.4z" />
+    </svg>
+  );
+  const VercelMark = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 23 21H1L12 2z" /></svg>
+  );
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="modal-inner" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>estilo</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <p className="modal-hint">
+          La marca es monocromo más <b>un solo color</b>. Ese color no es un valor suelto:
+          es una rampa de 8 pasos de la que sale el degradado del foil, así que al cambiarlo
+          se regenera todo — títulos, numerales, reglas e íconos.
+        </p>
+
+        <div className="modal-section">Color principal</div>
+        <div className="swatches">
+          {window.ACCENT_SWATCHES.map((s) => (
+            <button key={s.hex} title={s.label}
+              className={`swatch ${accent.toLowerCase() === s.hex.toLowerCase() ? "active" : ""}`}
+              onClick={() => setAccent(s.hex)}>
+              <span className="swatch-fill" style={{ background: s.hex }} />
+            </button>
+          ))}
+          <span className="swatch-name">o elegí uno</span>
+        </div>
+        <div className="hue-row">
+          <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} />
+          <input className="hue-hex" value={accent.toUpperCase()} spellCheck={false}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              if (/^#[0-9a-fA-F]{6}$/.test(v)) setAccent(v);
+            }} />
+          <div className="ramp-strip" title="La rampa generada">
+            {[100, 200, 300, 400, 500, 600, 700, 800].map((k) => (
+              <span key={k} style={{ background: ramp[k] }} title={`${k} · ${ramp[k]}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-section">Textura · grano de película</div>
+        <div className="texture-grid">
+          {Object.entries(t).map(([id, tex]) => (
+            <button key={id} className={`texture-card ${texture === id ? "active" : ""}`}
+              onClick={() => setTexture(id)}>
+              <div className={`texture-swatch ${id === "none" ? "" : ""}`}>
+                {tex.dark && <span className="tex" style={{ backgroundImage: `url(${tex.dark})` }} />}
+              </div>
+              <div className="texture-info">
+                <div className="texture-name">{tex.label}</div>
+                <div className="texture-desc">{tex.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="slider-row">
+          <label htmlFor="grain-range">Intensidad</label>
+          <input id="grain-range" type="range" min="0" max="100" step="5" value={grain}
+            disabled={texture === "none"}
+            onChange={(e) => setGrain(parseInt(e.target.value, 10))} />
+          <output>{texture === "none" ? "—" : grain + "%"}</output>
+        </div>
+
+        <div className="modal-section">Publicar tu copia</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          Estos botones clonan el repo en tu cuenta y lo dejan online. No tocan este sitio.
+        </p>
+        <div className="deploy-row">
+          <a className="deploy-btn" href={window.DEPLOY.netlify} target="_blank" rel="noopener noreferrer">
+            <NetlifyMark /> Deploy en Netlify
+          </a>
+          <a className="deploy-btn" href={window.DEPLOY.vercel} target="_blank" rel="noopener noreferrer">
+            <VercelMark /> Deploy en Vercel
+          </a>
         </div>
       </div>
     </div>
@@ -580,7 +678,20 @@ function App() {
   const [editing, setEditing] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showStyle, setShowStyle] = useState(false);
   const bookRef = useRef(null);
+
+  // Hue and film stock are kit-wide, so they persist on their own keys and are
+  // reapplied on every mount — a reload must not silently revert the look.
+  const [accent, setAccentRaw] = useState(() => loadJSON(K.accent, window.ACCENT_DEFAULT));
+  const [texture, setTextureRaw] = useState(() => loadJSON(K.texture, window.TEXTURE_DEFAULT));
+  const [grain, setGrainRaw] = useState(() => loadJSON(K.grain, window.GRAIN_DEFAULT));
+  const setAccent = (v) => { setAccentRaw(v); saveJSON(K.accent, v); };
+  const setTexture = (v) => { setTextureRaw(v); saveJSON(K.texture, v); };
+  const setGrain = (v) => { setGrainRaw(v); saveJSON(K.grain, v); };
+
+  useLayoutEffect(() => { window.applyAccent(accent); }, [accent]);
+  useLayoutEffect(() => { window.applyTexture(texture, grain); }, [texture, grain]);
 
   const [spreads, setSpreadsRaw] = useState(() => {
     const saved = loadJSON(K.spreads, null);
@@ -637,7 +748,12 @@ function App() {
         </button>
         <button className="tb-btn" onClick={() => setShowPresets(true)}>◆ Contenido</button>
         <button className="tb-btn" onClick={() => setShowBuilder(true)}>☰ Spreads ({spreads.length})</button>
+        <button className="tb-btn" onClick={() => setShowStyle(true)}>
+          <span style={{ color: "var(--accent)" }}>●</span> Estilo
+        </button>
         <span className="topbar-spacer" />
+        <a className="tb-btn" href={window.DEPLOY.netlify} target="_blank" rel="noopener noreferrer"
+           style={{ textDecoration: "none" }}>◆ Netlify</a>
         <button className="tb-btn primary" onClick={() => window.print()}>↓ PDF</button>
       </div>
 
@@ -649,6 +765,10 @@ function App() {
         ))}
       </div>
 
+      <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
+        accent={accent} setAccent={setAccent}
+        texture={texture} setTexture={setTexture}
+        grain={grain} setGrain={setGrain} />
       <PresetModal open={showPresets} onClose={() => setShowPresets(false)} currentId={preset.id} />
       <SpreadBuilder open={showBuilder} onClose={() => setShowBuilder(false)}
         spreads={spreads} setSpreads={setSpreads} />

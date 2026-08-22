@@ -27,6 +27,14 @@ El botón **◆ Contenido** cambia el contenido, no el diseño:
 
 Cargar un preset reemplaza textos y listas. Las fotos que subiste se mantienen.
 
+## Estilo: color y textura
+
+El botón **● Estilo** en la barra abre los controles de marca.
+
+**Color principal.** El naranja no es un valor suelto: es una rampa de 8 pasos de la que sale el degradado del foil. Al cambiarlo se regenera todo — títulos, numerales, reglas de índice e íconos. Los pasos se derivan aplicando al color nuevo los mismos factores de saturación y luminosidad medidos en la rampa cobre original, así que cualquier tono sigue leyéndose como foil metálico y no como color plano. Hay seis presets (cobre, oro, plata, carmesí, verdigrís, violeta) y selector libre.
+
+**Textura.** El grano es una propiedad del kit entero, no de una foto suelta: un press kit se imprime en un solo stock. Hay cuatro opciones — Fino, Medio (el del kit original), Grueso y Sin grano — más un control de intensidad. Cada estilo trae un par: una placa casi negra que hace `screen` sobre los fondos oscuros y una casi blanca que hace `multiply` sobre los de papel. Las seis son tiles de 400px sin costura.
+
 ## Todo es editable
 
 - **Textos** — click en cualquier texto con el modo **✎ Editar** activo. Títulos, eyebrows, bio, handles, footlines.
@@ -45,7 +53,7 @@ Activá **"Gráficos de fondo"** en el diálogo, si no se pierden las fotos, el 
 
 ## Deploy de un click
 
-Sitio estático puro, sin build. Cualquiera de estos botones clona el repo en tu cuenta y lo deja online:
+Sitio estático puro, sin build. Los botones están **dentro de la app**, en *● Estilo → Publicar tu copia*, y hay un acceso directo a Netlify en la barra superior. También desde acá:
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/solocachengue/djpresskit)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsolocachengue%2Fdjpresskit)

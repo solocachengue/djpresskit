@@ -295,7 +295,142 @@ const PRESETS = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BRAND HUE
+// The brand is monochrome plus exactly one chromatic family. That family is a
+// ramp of eight steps, not a single swatch, and the foil gradient is built out
+// of those steps — so changing "the orange" means regenerating all of it.
+//
+// The offsets below were measured off the original copper ramp: relative to
+// the core (copper-300), each step multiplies saturation and lightness by a
+// fixed factor and drifts hue slightly warm toward the light end. Applying the
+// same factors to any base colour reproduces the ramp's internal structure, so
+// a new hue still reads as foil rather than as flat colour.
+// ═══════════════════════════════════════════════════════════════════════════
+const RAMP_OFFSETS = {
+  100: [ 5.1, 1.1422, 1.2189],
+  200: [ 2.8, 1.1186, 1.0828],
+  300: [ 0.0, 1.0000, 1.0000],
+  400: [-0.1, 0.9033, 0.9142],
+  500: [-0.8, 0.8047, 0.8314],
+  600: [-0.5, 0.6825, 0.7101],
+  700: [-1.5, 0.7280, 0.5325],
+  800: [-1.5, 0.7456, 0.3521],
+};
+
+const ACCENT_DEFAULT = "#E8926A"; // copper — the source kit's foil
+
+const ACCENT_SWATCHES = [
+  { hex: "#E8926A", label: "Copper" },
+  { hex: "#D4AF37", label: "Gold" },
+  { hex: "#C0C4CC", label: "Silver" },
+  { hex: "#E0505A", label: "Crimson" },
+  { hex: "#5FA8A0", label: "Verdigris" },
+  { hex: "#8A7FD4", label: "Violet" },
+];
+
+function hexToHsl(hex) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255,
+        g = parseInt(h.slice(2, 4), 16) / 255,
+        b = parseInt(h.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let s = 0, hue = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0));
+    else if (max === g) hue = (b - r) / d + 2;
+    else hue = (r - g) / d + 4;
+    hue *= 60;
+  }
+  return [hue, s * 100, l * 100];
+}
+
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60)       [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else              [r, g, b] = [c, 0, x];
+  const to = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+
+function buildRamp(baseHex) {
+  const [h, s, l] = hexToHsl(baseHex);
+  const ramp = {};
+  for (const step of Object.keys(RAMP_OFFSETS)) {
+    const [dh, rs, rl] = RAMP_OFFSETS[step];
+    ramp[step] = hslToHex(h + dh, s * rs, l * rl);
+  }
+  return ramp;
+}
+
+function applyAccent(baseHex) {
+  const r = buildRamp(baseHex || ACCENT_DEFAULT);
+  const root = document.documentElement;
+  for (const step of Object.keys(r)) root.style.setProperty(`--copper-${step}`, r[step]);
+  const [cr, cg, cb] = [1, 3, 5].map((i) => parseInt(r[300].slice(i, i + 2), 16));
+  root.style.setProperty("--accent-quiet", `rgba(${cr},${cg},${cb},.5)`);
+  // The foil is the ramp read out of order — light, mid and dark steps
+  // interleaved so the gradient reads as a metallic sheen, not a fade.
+  root.style.setProperty("--foil-copper",
+    `linear-gradient(104deg,${r[600]} 0%,${r[300]} 18%,${r[100]} 32%,${r[400]} 46%,${r[600]} 62%,${r[200]} 78%,${r[500]} 100%)`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILM STOCK
+// Grain is a property of the whole kit, not of one photo — a press kit is
+// printed on one stock. Each style ships a matched pair: a near-black plate
+// that SCREENS over the stage grounds and a near-white plate that MULTIPLIES
+// over the paper ones. All are seamless 400px tiles.
+// ═══════════════════════════════════════════════════════════════════════════
+const TEXTURES = {
+  fine:   { label: "Fino",   desc: "Grano cerrado, casi digital",
+            dark: "assets/texture-grain-fine.png",   paper: "assets/texture-paper-fine.png" },
+  medium: { label: "Medio",  desc: "El del kit original",
+            dark: "assets/texture-grain-medium.png", paper: "assets/texture-paper-medium.png" },
+  coarse: { label: "Grueso", desc: "Película empujada, más sucio",
+            dark: "assets/texture-grain-coarse.png", paper: "assets/texture-paper-coarse.png" },
+  none:   { label: "Sin grano", desc: "Superficies limpias", dark: null, paper: null },
+};
+
+const TEXTURE_DEFAULT = "medium";
+const GRAIN_DEFAULT = 55; // intensidad 0–100
+
+function applyTexture(id, intensity) {
+  const t = TEXTURES[id] || TEXTURES[TEXTURE_DEFAULT];
+  const root = document.documentElement;
+  const i = (intensity == null ? GRAIN_DEFAULT : intensity) / 100;
+  if (!t.dark) {
+    root.style.setProperty("--grain-opacity-dark", "0");
+    root.style.setProperty("--grain-opacity-paper", "0");
+    return;
+  }
+  root.style.setProperty("--grain-dark", `url("${t.dark}")`);
+  root.style.setProperty("--grain-light", `url("${t.paper}")`);
+  root.style.setProperty("--grain-opacity-dark", String(i));
+  // Paper carries slightly less: multiply on a light ground bites harder.
+  root.style.setProperty("--grain-opacity-paper", String(i * 0.9));
+}
+
+// One-click deploy targets. The repo is public, so these clone it into the
+// visitor's own account rather than touching this deployment.
+const REPO_URL = "https://github.com/solocachengue/djpresskit";
+const DEPLOY = {
+  netlify: `https://app.netlify.com/start/deploy?repository=${REPO_URL}`,
+  vercel: `https://vercel.com/new/clone?repository-url=${encodeURIComponent(REPO_URL)}`,
+};
+
 Object.assign(window, {
   Icon, DisplayTitle, Eyebrow, Wordmark, GhostWord, IndexRow, SocialRow, SocialRail,
   SPREAD_TYPES, DEFAULT_SPREADS, PRESETS, IMAGE_SLOTS,
+  buildRamp, applyAccent, ACCENT_DEFAULT, ACCENT_SWATCHES,
+  TEXTURES, TEXTURE_DEFAULT, GRAIN_DEFAULT, applyTexture, DEPLOY, REPO_URL,
 });
