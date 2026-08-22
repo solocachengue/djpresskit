@@ -27,6 +27,21 @@ El botón **◆ Contenido** cambia el contenido, no el diseño:
 
 Cargar un preset reemplaza textos y listas. Las fotos que subiste se mantienen.
 
+## Formato: horizontal y vertical
+
+El kit tiene **dos tableros**, no uno escalado. El botón **● Estilo → Formato** los cambia.
+
+| Tablero | Medida | Para qué |
+|---|---|---|
+| **Horizontal** | 1280×655 (1.95:1) | El spread del press kit original |
+| **Vertical** | 432×768 (9:16) | La página del teléfono |
+
+El vertical **no es el horizontal apretado**: un tablero 1.95:1 escalado al ancho de un teléfono deja el cuerpo de texto en 4px. Es un tablero propio, con su composición y su escala tipográfica. Donde el horizontal ancla el contenido al tercio izquierdo con la masa de imagen a la derecha, el vertical gira esa misma relación 90°: contenido arriba, imagen abajo.
+
+Ajustes que hace el vertical, además de reacomodar: la fila de contacto pasa a columna (cuatro handles con su texto no entran en 432px), el índice de venues pasa a una sola columna, y la cuña de papel rasgado de la contratapa gira a una banda superior. El sticker se mueve al papel de la página, porque su recorte trae un plato opaco que sobre una foto se vería como un recuadro.
+
+En **automático** se usa el vertical cuando la pantalla mide menos de 900px. El PDF sale en hoja del mismo ratio que el tablero activo: 338×173mm el horizontal, 148×263mm el vertical.
+
 ## Estilo: color y textura
 
 El botón **● Estilo** en la barra abre los controles de marca.
@@ -40,6 +55,7 @@ El botón **● Estilo** en la barra abre los controles de marca.
 - **Textos** — click en cualquier texto con el modo **✎ Editar** activo. Títulos, eyebrows, bio, handles, footlines.
 - **Listas numeradas** — géneros, credenciales y venues se agregan, editan y borran fila por fila.
 - **Links y redes** — en **◆ Contenido → Links y redes**. Una sola lista alimenta los tres spreads que muestran contacto: la fila de *social media* y los rieles verticales de *degree & skills* y la contratapa. De cada link editás plataforma, texto y URL, y podés agregar, reordenar y borrar. El texto se ve solo en la fila; en los rieles va el ícono solo.
+- **Marca de fondo en la tapa** — el slot *marca de fondo* pone un logo enorme detrás del wordmark. La app mide el borde de la imagen y elige sola el modo de fusión: un logo blanco sobre negro se compone con `screen` y uno negro sobre blanco con `multiply`, así el plato opaco de la imagen desaparece en vez de estampar un recuadro. Arranca al 50% de brillo; se sube con `◐`.
 - **Imágenes** — *todas*. No hay ninguna imagen soldada al layout: retratos, cover art, foto de venue, y también los props de marca (auriculares, vinilo, sticker die-cut, sprays de spray-paint, logos de partners). Click en cualquiera para reemplazarla, `◐` para regular el brillo, `✕` para vaciarla.
 
 Los props que quedan vacíos simplemente desaparecen del spread — nunca sale un placeholder punteado en el PDF.

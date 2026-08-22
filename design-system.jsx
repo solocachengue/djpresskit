@@ -128,6 +128,156 @@ function SocialRail({ items, size = 22, gap = 46, style }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ARTBOARDS
+// Two formats, one system. The landscape board is the source press kit's own
+// spread. The portrait board is not that spread squeezed: a 1.95:1 artboard
+// scaled to a 390px phone renders body copy at 4px, so the vertical format is
+// its own board with its own type scale, authored at sizes that read at phone
+// width and scaled UP on desktop (everything but the photos is vector, and the
+// photos are 1400px+, so enlarging costs nothing).
+// ═══════════════════════════════════════════════════════════════════════════
+const FORMATS = {
+  landscape: {
+    id: "landscape", label: "Horizontal", w: 1280, h: 655,
+    page: "338mm 173mm", maxScale: 1,
+    desc: "El spread del kit original, 1.95:1",
+  },
+  portrait: {
+    // 9:16 — the phone's own ratio, and the one a DJ actually shares. A 3:4
+    // board could not hold the bio and the portrait together at a readable
+    // size; the taller page fits both without shrinking the type.
+    id: "portrait", label: "Vertical", w: 432, h: 768,
+    page: "148mm 263mm", maxScale: 2.1,
+    desc: "Página 9:16, la del teléfono",
+  },
+};
+
+// Below this viewport width the landscape board cannot be read, so "auto"
+// serves the portrait one.
+const PORTRAIT_BREAKPOINT = 900;
+
+const resolveFormat = (choice) => {
+  if (choice === "landscape" || choice === "portrait") return FORMATS[choice];
+  return window.innerWidth < PORTRAIT_BREAKPOINT ? FORMATS.portrait : FORMATS.landscape;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPOSITIONS
+// One content tree per spread, two sets of measurements. The landscape board
+// anchors content to the left third with the image mass on the right; the
+// portrait board turns that same relationship through 90° — content on top,
+// image mass below — rather than shrinking the columns until they collapse.
+// ═══════════════════════════════════════════════════════════════════════════
+const LAYOUT = {
+  cover: {
+    landscape: { gutter: 110, barY: 54, eyebrow: 11, wordmark: 132,
+                 propW: 300, propH: 210, propGap: -18 },
+    portrait:  { gutter: 34,  barY: 40, eyebrow: 9, wordmark: 58,
+                 propW: 168, propH: 118, propGap: -10 },
+  },
+  story: {
+    landscape: {
+      body: { display: "grid", gridTemplateColumns: "1fr 1.05fr", alignItems: "center",
+              padding: "0 0 0 110px", gap: 60 },
+      col: { gap: 40 }, title: 72, eyebrow: 13, bio: 13.5, bioGap: 18, bioMax: 440,
+      figure: { position: "relative", height: "100%" },
+      photo: { position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 500, height: 500 },
+      spray: { position: "absolute", left: -70, bottom: 40, width: 140, height: 230, zIndex: 2 },
+      stickerScope: "figure",
+      sticker: { position: "absolute", left: -34, bottom: 56, width: 96, height: 96, zIndex: 4 },
+    },
+    portrait: {
+      body: { display: "flex", flexDirection: "column", padding: "46px 34px 36px", gap: 18 },
+      col: { gap: 14 }, title: 48, eyebrow: 9, bio: 11.5, bioGap: 11, bioMax: "100%",
+      figure: { position: "relative", flex: 1, minHeight: 0, marginTop: 2 },
+      photo: { position: "absolute", inset: 0 },
+      spray: { position: "absolute", left: -14, bottom: -8, width: 62, height: 104, zIndex: 4 },
+      // The sticker was cropped from a flattened spread, so it carries an opaque
+      // paper plate. On the landscape board it lands on the paper ground and the
+      // plate is invisible; stacked vertically the photo runs full width, so it
+      // moves onto the page's own paper instead of stamping a white box on the
+      // portrait.
+      stickerScope: "page",
+      sticker: { position: "absolute", right: 24, top: 36, width: 62, height: 62, zIndex: 6 },
+    },
+  },
+  social: {
+    landscape: { ghost: 230, ghostTop: "52%", iconSize: 20, gap: 26, bottom: 90, dir: "row" },
+    portrait:  { ghost: 88,  ghostTop: "44%", iconSize: 17, gap: 12, bottom: 56, dir: "column" },
+  },
+  music: {
+    landscape: {
+      body: { display: "grid", gridTemplateColumns: "1fr 1.5fr", alignItems: "center",
+              padding: "0 0 0 110px", gap: 40 },
+      col: { gap: 44, borderRight: "1px solid var(--rule-on-stage)", paddingRight: 56,
+             height: "64%", justifyContent: "center" },
+      title: 70, eyebrow: 13, indexRule: 110, indexGap: 14, indexFs: 15,
+      figure: { position: "relative", height: "100%" },
+      art: { position: "absolute", left: 40, top: "50%", transform: "translateY(-50%)", width: 330, height: 330 },
+      vinyl: { position: "absolute", right: 20, top: "50%", transform: "translateY(-50%)", width: 420, height: 420 },
+      spray: { position: "absolute", left: 470, top: 60, width: 130, height: 280 },
+      card: { left: 22, bottom: 22 }, cardHandle: 11, cardLine: 42,
+    },
+    portrait: {
+      body: { display: "flex", flexDirection: "column", padding: "38px 34px 30px", gap: 18 },
+      col: { gap: 14 },
+      title: 50, eyebrow: 9, indexRule: 30, indexGap: 9, indexFs: 11.5,
+      figure: { position: "relative", flex: 1, minHeight: 0 },
+      art: { position: "absolute", left: 0, bottom: 0, width: 236, height: 236 },
+      vinyl: { position: "absolute", right: -34, bottom: 20, width: 220, height: 220 },
+      spray: { position: "absolute", right: 6, top: -10, width: 62, height: 130 },
+      card: { left: 12, bottom: 12 }, cardHandle: 8, cardLine: 26,
+    },
+  },
+  skills: {
+    landscape: {
+      col: { position: "absolute", inset: 0, padding: "0 0 0 110px", width: 620,
+             justifyContent: "center", gap: 48 },
+      title: 62, eyebrow: 13, indexGap: 16, indexFs: 15,
+      prop: { position: "absolute", right: 70, top: "46%", transform: "translateY(-50%)", width: 460, height: 320 },
+      logos: { position: "absolute", left: 110, bottom: 60, gap: 26 }, logoH: 74,
+      rail: { right: 44, size: 22, gap: 46 },
+    },
+    portrait: {
+      col: { position: "absolute", left: 0, right: 0, top: 0, padding: "38px 60px 0 34px",
+             justifyContent: "flex-start", gap: 16 },
+      title: 44, eyebrow: 9, indexGap: 11, indexFs: 11.5,
+      prop: { position: "absolute", left: "50%", bottom: 120, transform: "translateX(-50%)", width: 290, height: 200 },
+      logos: { position: "absolute", left: 34, bottom: 36, gap: 16 }, logoH: 46,
+      rail: { right: 12, size: 15, gap: 22 },
+    },
+  },
+  trust: {
+    landscape: {
+      body: { padding: "0 90px 0 110px", justifyContent: "center", gap: 38 },
+      title: 62, eyebrow: 13, columns: 2, ruleWidth: 110, indexGap: 12, indexFs: 15, colGap: 70,
+    },
+    portrait: {
+      body: { padding: "38px 30px 30px", justifyContent: "flex-start", gap: 16 },
+      title: 46, eyebrow: 9, columns: 1, ruleWidth: 26, indexGap: 8, indexFs: 10.5, colGap: 0,
+    },
+  },
+  back: {
+    landscape: {
+      wedge: "polygon(0 0,34% 0,17% 100%,0 100%)",
+      bar: { left: 0, top: 0, bottom: 0, width: 34 },
+      ghost: 190, ghostStyle: { top: "50%", transform: "translateY(-50%)", left: 372 },
+      rail: { right: 46, size: 20, gap: 52 },
+      foot: { left: 54, bottom: 44, width: 170, fontSize: 9 },
+    },
+    portrait: {
+      // The diagonal turns with the board: a band across the top instead of a
+      // wedge down the side, so it still splits the composition on a diagonal.
+      wedge: "polygon(0 0,100% 0,100% 17%,0 29%)",
+      bar: { left: 0, right: 0, top: 0, height: 13 },
+      ghost: 68, ghostStyle: { top: "60%", transform: "translateY(-50%)", left: 26 },
+      rail: { right: 12, size: 15, gap: 24 },
+      foot: { left: 30, top: 30, width: 220, fontSize: 8.5 },
+    },
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SPREAD INVENTORY
 // Seven spreads, traced one-to-one to the source press kit.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -157,6 +307,7 @@ const DEFAULT_SPREADS = ["cover", "story", "social", "music", "skills", "trust",
 const IMAGE_SLOTS = {
   "cv-hero":     { hint: "foto de portada a sangre" },
   "cv-prop":     { hint: "prop de portada (PNG sin fondo)" },
+  "cv-mark":     { hint: "marca de fondo (grande, atrás)" },
   "st-portrait": { hint: "retrato cálido" },
   "st-spray":    { hint: "textura / spray" },
   "st-sticker":  { hint: "sticker die-cut" },
@@ -442,6 +593,7 @@ const DEPLOY = {
 Object.assign(window, {
   Icon, DisplayTitle, Eyebrow, Wordmark, GhostWord, IndexRow, SocialRow, SocialRail,
   SPREAD_TYPES, DEFAULT_SPREADS, PRESETS, IMAGE_SLOTS, ICON_OPTIONS,
+  FORMATS, LAYOUT, resolveFormat, PORTRAIT_BREAKPOINT,
   buildRamp, applyAccent, ACCENT_DEFAULT, ACCENT_SWATCHES,
   TEXTURES, TEXTURE_DEFAULT, GRAIN_DEFAULT, applyTexture, DEPLOY, REPO_URL,
 });

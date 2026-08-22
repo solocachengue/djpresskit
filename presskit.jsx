@@ -27,6 +27,7 @@ const K = {
   accent:  "eskay.accent.v1",
   texture: "eskay.texture.v1",
   grain:   "eskay.grain.v1",
+  format:  "eskay.format.v1",
 };
 
 // Three layers, in precedence order:
@@ -271,15 +272,54 @@ function Editable({ tag = "span", id, fallback = "", className, style, multiline
 // must never reach the printed PDF.
 function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
                     filter, objectPosition, fit = "cover", mode = "bg",
-                    optional = false, children }) {
+                    optional = false, autoBlend = false, defaultOpacity = 1, children }) {
   const presetSrc = (() => {
     const p = activePreset();
     return (p.images && p.images[id]) || (p.sharedImages && p.sharedImages[id]) || null;
   })();
   const [src, setSrc] = useState(() => { const s = loadImages()[id]; return s !== undefined ? s : presetSrc; });
-  const [opacity, setOpacity] = useState(() => { const o = loadJSON(K.opacity, {}); return o[id] != null ? o[id] : 1; });
+  const [opacity, setOpacity] = useState(() => { const o = loadJSON(K.opacity, {}); return o[id] != null ? o[id] : defaultOpacity; });
   const [showSlider, setShowSlider] = useState(false);
+  const [blend, setBlend] = useState(null);
   const inputRef = useRef(null);
+
+  // A mark laid over the stage has to lose its own plate. Which blend does that
+  // depends on the plate: a white logo on black needs SCREEN, a black logo on
+  // white needs MULTIPLY, and picking wrong stamps a solid box on the spread.
+  // Rather than ask, sample the image's border and decide from it.
+  useEffect(() => {
+    if (!autoBlend || !src) { setBlend(null); return; }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const n = 32;
+        const c = document.createElement("canvas");
+        c.width = n; c.height = n;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, n, n);
+        const d = ctx.getImageData(0, 0, n, n).data;
+        let sum = 0, count = 0;
+        for (let y = 0; y < n; y++) {
+          for (let x = 0; x < n; x++) {
+            const edge = x < 2 || y < 2 || x >= n - 2 || y >= n - 2;
+            if (!edge) continue;
+            const i = (y * n + x) * 4;
+            if (d[i + 3] < 24) continue;            // ya transparente: no aporta
+            sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            count++;
+          }
+        }
+        if (!count) return setBlend(null);          // plato transparente: sin fusión
+        const luma = sum / count / 255;
+        setBlend(luma < 0.35 ? "screen" : luma > 0.72 ? "multiply" : null);
+      } catch { setBlend(null); }
+    };
+    img.src = src;
+    return () => { cancelled = true; };
+  }, [autoBlend, src]);
 
   const onPick = (e) => {
     const file = e.target.files && e.target.files[0]; if (!file) return;
@@ -318,7 +358,8 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
         // slots use would paint a black rectangle across its transparency.
         <img src={src} alt="" aria-hidden="true"
           style={{ width: "100%", height: "100%", objectFit: fit, objectPosition: objectPosition || "center",
-                   display: "block", filter: filter || undefined, opacity, pointerEvents: "none" }} />
+                   display: "block", filter: filter || undefined, opacity,
+                   mixBlendMode: blend || undefined, pointerEvents: "none" }} />
       )}
       <div className="hint"><div className="icon">+</div><div>{label}</div></div>
       {children}
@@ -345,7 +386,7 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
 // Every list in this brand is an index. This is the one editor behind all
 // three of them (genres, credentials, venues).
 function IndexEditor({ storageKey, presetKey, tone = "on-stage", ruleWidth = 120,
-                       gap = 16, editing, withDetail = true, start = 1, slice, addLabel = "Agregar" }) {
+                       gap = 16, fontSize, editing, withDetail = true, start = 1, slice, addLabel = "Agregar" }) {
   const [items, setItems] = useState(() => loadJSON(storageKey, activePreset()[presetKey] || []));
   const persist = (next) => { setItems(next); saveJSON(storageKey, next); };
   const update = (i, k, v) => persist(items.map((x, idx) => idx === i ? { ...x, [k]: v } : x));
@@ -357,7 +398,7 @@ function IndexEditor({ storageKey, presetKey, tone = "on-stage", ruleWidth = 120
 
   return (
     <>
-      <ol className="ds-index" style={{ gap }}>
+      <ol className="ds-index" style={{ gap, "--index-fs": fontSize ? fontSize + "px" : undefined }}>
         {shown.map((it, i) => {
           const realIdx = offset + i;
           return (
@@ -395,34 +436,47 @@ function IndexEditor({ storageKey, presetKey, tone = "on-stage", ruleWidth = 120
 // SPREAD 01 — COVER
 // Black stage, copper foil wordmark, floating prop, tracked footline.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadCover({ wordmark, editing }) {
+function SpreadCover({ wordmark, editing, fmt }) {
+  const L = window.LAYOUT.cover[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="cv-hero" editing={editing} optional
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
+
+      {/* Background mark: a logo set enormous behind the content, the image
+          counterpart of the ghost wordmark. Composited with SCREEN so a mark
+          delivered on an opaque black plate — most DJ logos are — drops its
+          background instead of stamping a visible box on the stage. */}
+      <ImageSlot id="cv-mark" editing={editing} optional mode="img" fit="contain" autoBlend
+        defaultOpacity={.5}
+        style={{ position: "absolute", left: "50%", top: "48%",
+                 transform: "translate(-50%,-50%)",
+                 width: fmt === "portrait" ? 330 : 780,
+                 height: fmt === "portrait" ? 330 : 420, zIndex: 2 }} />
+
       <div className="grain" />
 
-      <div className="layer" style={{ position: "absolute", top: 54, left: 110, right: 110, zIndex: 4,
-                    display: "flex", justifyContent: "space-between" }}>
-        <Eyebrow tone="on-stage" size={11}><Editable id="cv-kicker" fallback="Press Kit" /></Eyebrow>
-        <Eyebrow tone="on-stage" size={11}><Editable id="cv-year" fallback="2026" /></Eyebrow>
+      <div className="layer" style={{ position: "absolute", top: L.barY, left: L.gutter, right: L.gutter,
+                                      zIndex: 4, display: "flex", justifyContent: "space-between" }}>
+        <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="cv-kicker" fallback="Press Kit" /></Eyebrow>
+        <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="cv-year" fallback="2026" /></Eyebrow>
       </div>
 
       <div className="layer" style={{ position: "absolute", inset: 0, zIndex: 3, display: "flex",
-                    flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                                      flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
         <ImageSlot id="cv-prop" editing={editing} mode="img" fit="contain" optional
           filter="drop-shadow(0 24px 60px rgba(0,0,0,.45))"
-          style={{ width: 300, height: 210, marginBottom: -18 }} />
-        <Wordmark size={132} style={{ lineHeight: .92, textAlign: "center" }}>
+          style={{ width: L.propW, height: L.propH, marginBottom: L.propGap }} />
+        <Wordmark size={L.wordmark} style={{ lineHeight: .92, textAlign: "center" }}>
           <Editable id="cv-wordmark" fallback={wordmark} />
         </Wordmark>
       </div>
 
-      <div className="layer" style={{ position: "absolute", bottom: 54, left: 110, right: 110, zIndex: 4,
-                    display: "flex", justifyContent: "space-between" }}>
-        <Eyebrow tone="on-stage" size={11}><Editable id="cv-foot-left" fallback="Eskay Da Real" /></Eyebrow>
-        <Eyebrow tone="on-stage" size={11}><Editable id="cv-foot-right" fallback="Music Producer" /></Eyebrow>
+      <div className="layer" style={{ position: "absolute", bottom: L.barY, left: L.gutter, right: L.gutter,
+                                      zIndex: 4, display: "flex", justifyContent: "space-between" }}>
+        <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="cv-foot-left" fallback="Eskay Da Real" /></Eyebrow>
+        <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="cv-foot-right" fallback="Music Producer" /></Eyebrow>
       </div>
     </div>
   );
@@ -433,32 +487,36 @@ function SpreadCover({ wordmark, editing }) {
 // Paper ground. The bio is the only paragraph text in seven spreads, and it is
 // justified with hyphenation — a deliberate print-magazine choice.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadStory({ editing }) {
+function SpreadStory({ editing, fmt }) {
+  const L = window.LAYOUT.story[fmt];
   return (
     <div className="spread" style={{ background: "var(--paper-100)" }}>
       <div className="grain grain--paper" />
-      <div className="layer" style={{ position: "absolute", inset: 0, display: "grid",
-                    gridTemplateColumns: "1fr 1.05fr", alignItems: "center",
-                    padding: "0 0 0 110px", gap: 60, zIndex: 3 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+      <div className="layer" style={{ position: "absolute", inset: 0, zIndex: 3, ...L.body }}>
+        <div style={{ display: "flex", flexDirection: "column", ...L.col }}>
           <div className="ds-heading">
-            <DisplayTitle size={72} tone="ink"><Editable id="st-title" fallback="story" /></DisplayTitle>
-            <Eyebrow tone="on-paper"><Editable id="st-eyebrow" fallback="About Him" /></Eyebrow>
+            <DisplayTitle size={L.title} tone="ink"><Editable id="st-title" fallback="story" /></DisplayTitle>
+            <Eyebrow tone="on-paper" size={L.eyebrow}><Editable id="st-eyebrow" fallback="About Him" /></Eyebrow>
           </div>
-          <div className="ds-bio on-paper" style={{ maxWidth: 440, fontSize: 13.5, gap: 18 }}>
+          <div className="ds-bio on-paper" style={{ maxWidth: L.bioMax, fontSize: L.bio, gap: L.bioGap }}>
             <p><Editable id="st-p1" multiline fallback="" /></p>
             <p><Editable id="st-p2" multiline fallback="" /></p>
           </div>
         </div>
-        <div style={{ position: "relative", height: "100%" }}>
+        <div style={L.figure}>
           <ImageSlot id="st-spray" editing={editing} mode="img" fit="contain" optional
-            style={{ position: "absolute", left: -70, bottom: 40, width: 140, height: 230, opacity: .9, zIndex: 2 }} />
+            style={{ ...L.spray, opacity: .9 }} />
           <ImageSlot id="st-portrait" editing={editing} filter="var(--filter-warm)"
-            style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
-                     width: 500, height: 500, boxShadow: "var(--shadow-photo)", zIndex: 3 }} />
-          <ImageSlot id="st-sticker" editing={editing} mode="img" fit="contain" optional
-            style={{ position: "absolute", left: -34, bottom: 56, width: 96, height: 96, zIndex: 4 }} />
+            style={{ ...L.photo, boxShadow: "var(--shadow-photo)", zIndex: 3 }} />
+          {L.stickerScope === "figure" && (
+            <ImageSlot id="st-sticker" editing={editing} mode="img" fit="contain" optional
+              style={L.sticker} />
+          )}
         </div>
+        {L.stickerScope === "page" && (
+          <ImageSlot id="st-sticker" editing={editing} mode="img" fit="contain" optional
+            style={L.sticker} />
+        )}
       </div>
     </div>
   );
@@ -468,20 +526,25 @@ function SpreadStory({ editing }) {
 // SPREAD 03 — SOCIAL MEDIA
 // Full-bleed b&w portrait, giant ghosted wordmark, contact row.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadSocial({ editing, social }) {
+function SpreadSocial({ editing, social, fmt }) {
+  const L = window.LAYOUT.social[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="so-portrait" editing={editing}
         filter="var(--filter-bw)" objectPosition="28% 20%"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
-      <GhostWord size={230} opacity={.1} style={{ top: "52%", textAlign: "center", transform: "translateY(-50%)" }}>
+      <GhostWord size={L.ghost} opacity={.1}
+        style={{ top: L.ghostTop, textAlign: "center", transform: "translateY(-50%)" }}>
         <Editable id="so-ghost" fallback="socialmedia" />
       </GhostWord>
       <div className="grain" />
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 90, zIndex: 5,
-                    display: "flex", justifyContent: "center" }}>
-        <SocialRow items={social} size={20} gap={26} />
+      <div className="layer" style={{ position: "absolute", left: 0, right: 0, bottom: L.bottom, zIndex: 5,
+                                      display: "flex", justifyContent: "center" }}>
+        {/* Four handles with their labels do not fit across a 432px board, so
+            the row becomes a column rather than wrapping into ragged pairs. */}
+        <SocialRow items={social} size={L.iconSize} gap={L.gap}
+          style={L.dir === "column" ? { flexDirection: "column", alignItems: "center" } : null} />
       </div>
     </div>
   );
@@ -491,42 +554,37 @@ function SpreadSocial({ editing, social }) {
 // SPREAD 04 — MUSIC / STYLE
 // Numbered genre index against cover art and a vinyl record.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadMusic({ editing }) {
+function SpreadMusic({ editing, fmt }) {
+  const L = window.LAYOUT.music[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-850)" }}>
       <div className="grain" />
       <ImageSlot id="mu-spray" editing={editing} mode="img" fit="contain" optional
-        style={{ position: "absolute", left: 470, top: 60, width: 130, height: 280, opacity: .9, zIndex: 2 }} />
-      <div className="layer" style={{ position: "absolute", inset: 0, display: "grid",
-                    gridTemplateColumns: "1fr 1.5fr", alignItems: "center",
-                    padding: "0 0 0 110px", gap: 40, zIndex: 3 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 44,
-                      borderRight: "1px solid var(--rule-on-stage)", paddingRight: 56,
-                      height: "64%", justifyContent: "center" }}>
+        style={{ ...L.spray, opacity: .9, zIndex: 2 }} />
+      <div className="layer" style={{ position: "absolute", inset: 0, zIndex: 3, ...L.body }}>
+        <div style={{ display: "flex", flexDirection: "column", ...L.col }}>
           <div className="ds-heading">
-            <DisplayTitle size={70}><Editable id="mu-title" fallback="music" /></DisplayTitle>
-            <Eyebrow tone="on-stage"><Editable id="mu-eyebrow" fallback="Style" /></Eyebrow>
+            <DisplayTitle size={L.title}><Editable id="mu-title" fallback="music" /></DisplayTitle>
+            <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="mu-eyebrow" fallback="Style" /></Eyebrow>
           </div>
           <div>
-            <IndexEditor storageKey={K.genres} presetKey="genres" ruleWidth={110}
-              gap={14} editing={editing} withDetail={false} addLabel="Agregar género" />
+            <IndexEditor storageKey={K.genres} presetKey="genres" ruleWidth={L.indexRule}
+              gap={L.indexGap} fontSize={L.indexFs} editing={editing} withDetail={false}
+              addLabel="Agregar género" />
           </div>
         </div>
-        <div style={{ position: "relative", height: "100%" }}>
+        <div style={L.figure}>
           <ImageSlot id="mu-vinyl" editing={editing} mode="img" fit="contain" optional
             filter="drop-shadow(0 24px 60px rgba(0,0,0,.45))"
-            style={{ position: "absolute", right: 20, top: "50%", transform: "translateY(-50%)",
-                     width: 420, height: 420, zIndex: 2 }} />
+            style={{ ...L.vinyl, zIndex: 2 }} />
           <ImageSlot id="mu-art" editing={editing} filter="var(--filter-bw)" objectPosition="50% 18%"
-            style={{ position: "absolute", left: 40, top: "50%", transform: "translateY(-50%)",
-                     width: 330, height: 330, background: "var(--ink-900)",
-                     boxShadow: "var(--shadow-photo)", zIndex: 3 }}>
+            style={{ ...L.art, background: "var(--ink-900)", boxShadow: "var(--shadow-photo)", zIndex: 3 }}>
             <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 3 }} />
-            <div style={{ position: "absolute", left: 22, bottom: 22, zIndex: 4 }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+            <div style={{ position: "absolute", ...L.card, zIndex: 4 }}>
+              <div style={{ fontSize: L.cardHandle, color: "var(--text-muted)", marginBottom: 5 }}>
                 <Editable id="mu-handle" fallback="@eskaydareal" />
               </div>
-              <div className="ds-display paper" style={{ fontSize: 42, lineHeight: .9 }}>
+              <div className="ds-display paper" style={{ fontSize: L.cardLine, lineHeight: .9 }}>
                 <Editable id="mu-card1" fallback="music" style={{ display: "block" }} />
                 <Editable id="mu-card2" fallback="style" style={{ display: "block" }} />
               </div>
@@ -542,34 +600,32 @@ function SpreadMusic({ editing }) {
 // SPREAD 05 — DEGREE & SKILLS / EVOLUTION
 // Credentials index on paper, partner marks bottom-left, social rail right.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadSkills({ editing, social }) {
+function SpreadSkills({ editing, social, fmt }) {
+  const L = window.LAYOUT.skills[fmt];
   return (
     <div className="spread" style={{ background: "var(--paper-100)" }}>
       <div className="grain grain--paper" />
       <ImageSlot id="sk-prop" editing={editing} mode="img" fit="contain" optional tone="paper"
-        style={{ position: "absolute", right: 70, top: "46%", transform: "translateY(-50%)",
-                 width: 460, height: 320, zIndex: 2 }} />
-      <div className="layer" style={{ position: "absolute", inset: 0, padding: "0 0 0 110px", width: 620,
-                    display: "flex", flexDirection: "column", justifyContent: "center",
-                    gap: 48, zIndex: 3 }}>
+        style={{ ...L.prop, zIndex: 2 }} />
+      <div className="layer" style={{ display: "flex", flexDirection: "column", zIndex: 3, ...L.col }}>
         <div className="ds-heading">
-          <DisplayTitle size={62} tone="ink"><Editable id="sk-title" fallback="degree & skills" /></DisplayTitle>
-          <Eyebrow tone="on-paper"><Editable id="sk-eyebrow" fallback="Evolution" /></Eyebrow>
+          <DisplayTitle size={L.title} tone="ink"><Editable id="sk-title" fallback="degree & skills" /></DisplayTitle>
+          <Eyebrow tone="on-paper" size={L.eyebrow}><Editable id="sk-eyebrow" fallback="Evolution" /></Eyebrow>
         </div>
         <div>
           <IndexEditor storageKey={K.creds} presetKey="credentials" tone="on-paper"
-            ruleWidth={0} gap={16} editing={editing} addLabel="Agregar credencial" />
+            ruleWidth={0} gap={L.indexGap} fontSize={L.indexFs} editing={editing}
+            addLabel="Agregar credencial" />
         </div>
       </div>
-      <div className="layer" style={{ position: "absolute", left: 110, bottom: 60, zIndex: 4,
-                    display: "flex", alignItems: "flex-end", gap: 26 }}>
+      <div className="layer" style={{ zIndex: 4, display: "flex", alignItems: "flex-end", ...L.logos }}>
         <ImageSlot id="sk-logo1" editing={editing} mode="img" tone="paper" fit="contain"
-          objectPosition="bottom left" style={{ width: 74, height: 74 }} />
+          objectPosition="bottom left" style={{ width: L.logoH, height: L.logoH }} />
         <ImageSlot id="sk-logo2" editing={editing} mode="img" tone="paper" fit="contain"
-          objectPosition="bottom left" style={{ width: 86, height: 74 }} />
+          objectPosition="bottom left" style={{ width: L.logoH * 1.16, height: L.logoH }} />
       </div>
-      <SocialRail items={social} size={22} gap={46}
-        style={{ position: "absolute", right: 44, top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
+      <SocialRail items={social} size={L.rail.size} gap={L.rail.gap}
+        style={{ position: "absolute", right: L.rail.right, top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
     </div>
   );
 }
@@ -578,31 +634,36 @@ function SpreadSkills({ editing, social }) {
 // SPREAD 06 — THEY TRUST / LOCATION
 // Two-column numbered venue index over a scrimmed venue photograph.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadTrust({ editing }) {
+function SpreadTrust({ editing, fmt }) {
+  const L = window.LAYOUT.trust[fmt];
   const venues = loadJSON(K.venues, activePreset().venues || []);
-  const half = Math.ceil(venues.length / 2);
+  // The portrait board is too narrow for two columns of venue names, so the
+  // index runs as one list rather than truncating the entries.
+  const half = L.columns === 2 ? Math.ceil(venues.length / 2) : venues.length;
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="tr-photo" editing={editing} filter="var(--filter-bw)"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "rgba(8,7,7,.66)", zIndex: 1 }} />
       <div className="grain" />
-      <div className="layer" style={{ position: "absolute", inset: 0, padding: "0 90px 0 110px", display: "flex",
-                    flexDirection: "column", justifyContent: "center", gap: 38, zIndex: 4 }}>
+      <div className="layer" style={{ position: "absolute", inset: 0, display: "flex",
+                                      flexDirection: "column", zIndex: 4, ...L.body }}>
         <div className="ds-heading">
-          <DisplayTitle size={62}><Editable id="tr-title" fallback="they trust" /></DisplayTitle>
-          <Eyebrow tone="on-stage"><Editable id="tr-eyebrow" fallback="Location" /></Eyebrow>
+          <DisplayTitle size={L.title}><Editable id="tr-title" fallback="they trust" /></DisplayTitle>
+          <Eyebrow tone="on-stage" size={L.eyebrow}><Editable id="tr-eyebrow" fallback="Location" /></Eyebrow>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "auto auto", columnGap: 70,
-                      alignItems: "start", justifyContent: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: L.columns === 2 ? "auto auto" : "auto",
+                      columnGap: L.colGap, alignItems: "start", justifyContent: "start" }}>
           <div>
-            <IndexEditor storageKey={K.venues} presetKey="venues" ruleWidth={110}
-              gap={12} editing={editing} slice={[0, half]} />
+            <IndexEditor storageKey={K.venues} presetKey="venues" ruleWidth={L.ruleWidth}
+              gap={L.indexGap} fontSize={L.indexFs} editing={editing} slice={[0, half]} />
           </div>
-          <div>
-            <IndexEditor storageKey={K.venues} presetKey="venues" ruleWidth={110}
-              gap={12} editing={editing} slice={[half, venues.length]} addLabel="Agregar venue" />
-          </div>
+          {L.columns === 2 && (
+            <div>
+              <IndexEditor storageKey={K.venues} presetKey="venues" ruleWidth={L.ruleWidth}
+                gap={L.indexGap} fontSize={L.indexFs} editing={editing} slice={[half, venues.length]} />
+            </div>
+          )}
         </div>
         {editing && (
           <button className="add-row" style={{ marginTop: 0 }}
@@ -619,43 +680,41 @@ function SpreadTrust({ editing }) {
 // SPREAD 07 — BACK COVER
 // Torn-paper collage splitting the composition on a diagonal.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadBack({ wordmark, editing, social }) {
+function SpreadBack({ wordmark, editing, social, fmt }) {
+  const L = window.LAYOUT.back[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-900)" }}>
       <ImageSlot id="bk-photo" editing={editing}
         filter="var(--filter-warm) brightness(.9)" objectPosition="46% 30%"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 1 }} />
-      {/* Clears the torn-paper wedge, which reaches ~348px into the spread at
-          this vertical band. Starting further left let the wedge swallow the
-          front of the name — "hardwell" read as "dwell". The ghost is meant to
-          be clipped by the artboard edge on the right, not by the collage. */}
-      <GhostWord size={190} opacity={.14} style={{ top: "50%", transform: "translateY(-50%)", left: 372 }}>
+      {/* Starts clear of the torn-paper collage: tucked behind it, a short name
+          loses its opening letters. It is meant to be cut by the artboard edge. */}
+      <GhostWord size={L.ghost} opacity={.14} style={L.ghostStyle}>
         <Editable id="bk-ghost" fallback={wordmark} />
       </GhostWord>
 
-      {/* Torn paper: the source is a photographed torn edge; this is a straight
-          diagonal clip standing in for it. */}
+      {/* The source uses a photographed torn edge; this is a straight diagonal
+          clip standing in for it, turned with the board. */}
       <div className="deco" style={{ position: "absolute", inset: 0, background: "var(--paper-100)",
-                    clipPath: "polygon(0 0,34% 0,17% 100%,0 100%)", opacity: .96, zIndex: 2 }}>
+                                     clipPath: L.wedge, opacity: .96, zIndex: 2 }}>
         <span style={{ position: "absolute", inset: 0, backgroundImage: "var(--grain-light)",
                        backgroundSize: "400px", opacity: .5, mixBlendMode: "multiply" }} />
       </div>
-      <div className="deco" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 34,
-                    background: "var(--copper-700)", opacity: .85, zIndex: 3 }} />
+      <div className="deco" style={{ position: "absolute", ...L.bar,
+                                     background: "var(--copper-700)", opacity: .85, zIndex: 3 }} />
       <div className="grain" />
 
-      {/* The paper wedge is only ~185px wide at the foot once the copper bar is
-          clear of it, so the contact drops to label tracking to fit inside it. */}
-      <div className="layer" style={{ position: "absolute", left: 54, bottom: 44, zIndex: 5, width: 170 }}>
+      <div className="layer" style={{ position: "absolute", zIndex: 5, left: L.foot.left,
+                                      bottom: L.foot.bottom, top: L.foot.top, width: L.foot.width }}>
         <div className="ds-eyebrow on-paper"
-          style={{ fontSize: 9, letterSpacing: "var(--ls-label)", lineHeight: 1.7, wordBreak: "break-word" }}>
+          style={{ fontSize: L.foot.fontSize, letterSpacing: "var(--ls-label)", lineHeight: 1.7, wordBreak: "break-word" }}>
           <Editable id="bk-foot" fallback="eskaydareal@gmail.com" />
         </div>
       </div>
 
-      <SocialRail items={social} size={20} gap={52}
-        style={{ position: "absolute", right: 46, top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
+      <SocialRail items={social} size={L.rail.size} gap={L.rail.gap}
+        style={{ position: "absolute", right: L.rail.right, top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
     </div>
   );
 }
@@ -780,7 +839,8 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
 // The hue, the film stock and the deploy links live here rather than in the
 // Tweaks panel: that panel only opens when an embedding host activates it, so
 // on the published site it never appears and its controls are unreachable.
-function StyleModal({ open, onClose, accent, setAccent, texture, setTexture, grain, setGrain }) {
+function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
+                     accent, setAccent, texture, setTexture, grain, setGrain }) {
   if (!open) return null;
   const ramp = window.buildRamp(accent);
   const t = window.TEXTURES;
@@ -805,6 +865,32 @@ function StyleModal({ open, onClose, accent, setAccent, texture, setTexture, gra
           La marca es monocromo más <b>un solo color</b>. Ese color no es un valor suelto:
           es una rampa de 8 pasos de la que sale el degradado del foil, así que al cambiarlo
           se regenera todo — títulos, numerales, reglas e íconos.
+        </p>
+
+        <div className="modal-section">Formato</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          El kit tiene dos tableros. El <b>horizontal</b> es el spread del press kit
+          original. El <b>vertical</b> no es ese spread apretado: un tablero 1.95:1
+          escalado a un teléfono deja el cuerpo de texto en 4px, así que es un tablero
+          propio, con su composición y su escala tipográfica. En <b>automático</b> se
+          usa el vertical cuando la pantalla es angosta.
+        </p>
+        <div className="fmt-row">
+          {[{ id: "auto", label: "Automático", desc: "Según el ancho de pantalla" },
+            { id: "landscape", label: window.FORMATS.landscape.label, desc: window.FORMATS.landscape.desc },
+            { id: "portrait", label: window.FORMATS.portrait.label, desc: window.FORMATS.portrait.desc }].map((o) => (
+            <button key={o.id} className={`fmt-card ${fmtChoice === o.id ? "active" : ""}`}
+              onClick={() => setFmtChoice(o.id)}>
+              <span className={`fmt-shape ${o.id}`} aria-hidden="true" />
+              <span className="fmt-name">{o.label}</span>
+              <span className="fmt-desc">{o.desc}</span>
+            </button>
+          ))}
+        </div>
+        <p className="modal-hint" style={{ marginTop: 12, marginBottom: 0 }}>
+          Ahora estás viendo el <b style={{ color: "var(--accent)" }}>{format.label.toLowerCase()}</b>
+          {" "}({format.w}×{format.h}). El PDF sale en hoja {format.page.replace(" ", " × ")}, con ese mismo
+          ratio, así que cada página va completa y sin bandas.
         </p>
 
         <div className="modal-section">Color principal</div>
@@ -940,6 +1026,11 @@ function App() {
 
   // Hue and film stock are kit-wide, so they persist on their own keys and are
   // reapplied on every mount — a reload must not silently revert the look.
+  // "auto" serves the portrait board on narrow viewports; an explicit choice wins.
+  const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "auto"));
+  const setFmtChoice = (v) => { setFmtChoiceRaw(v); saveJSON(K.format, v); };
+  const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "auto")));
+
   const [social, setSocialRaw] = useState(() => loadJSON(K.social, activePreset().social || []));
   const setSocial = (next) => { setSocialRaw(next); saveJSON(K.social, next); };
 
@@ -964,16 +1055,28 @@ function App() {
   useLayoutEffect(() => {
     const el = bookRef.current;
     if (!el) return;
+    const root = document.documentElement;
     const fit = () => {
+      const f = window.resolveFormat(fmtChoice);
+      setFormat((prev) => (prev.id === f.id ? prev : f));
+      root.style.setProperty("--sw", f.w + "px");
+      root.style.setProperty("--sh", f.h + "px");
       const w = el.clientWidth;
-      if (w > 0) document.documentElement.style.setProperty("--spread-scale", String(Math.min(1, w / 1280)));
+      if (w > 0) root.style.setProperty("--spread-scale", String(Math.min(f.maxScale, w / f.w)));
+      // @page can't read a custom property, so the print sheet is stamped into
+      // its own style element and follows whichever board is on screen.
+      let tag = document.getElementById("print-page-size");
+      if (!tag) { tag = document.createElement("style"); tag.id = "print-page-size"; document.head.appendChild(tag); }
+      tag.textContent = `@media print{@page{size:${f.page};margin:0}` +
+        `.spread-frame{width:${f.page.split(" ")[0]} !important;height:${f.page.split(" ")[1]} !important}` +
+        `.spread-frame > .spread-scaler{transform:scale(calc(${f.page.split(" ")[0]} / ${f.w}px)) !important}}`;
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     window.addEventListener("resize", fit);
     return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
-  }, []);
+  }, [fmtChoice]);
 
   // The wordmark shown in the chrome must follow the EDITED name, not the
   // preset's: a published kit renamed to another artist was still labelled
@@ -987,7 +1090,7 @@ function App() {
   };
 
   const renderSpread = (id, i) => {
-    const props = { editing, wordmark, social, key: `${id}-${i}` };
+    const props = { editing, wordmark, social, fmt: format.id, key: `${id}-${i}` };
     switch (id) {
       case "cover":  return <SpreadCover {...props} />;
       case "story":  return <SpreadStory {...props} />;
@@ -1029,6 +1132,7 @@ function App() {
       </div>
 
       <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
+        fmtChoice={fmtChoice} setFmtChoice={setFmtChoice} format={format}
         accent={accent} setAccent={setAccent}
         texture={texture} setTexture={setTexture}
         grain={grain} setGrain={setGrain} />

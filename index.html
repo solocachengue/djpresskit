@@ -107,7 +107,8 @@
     --filter-bw:grayscale(1) contrast(1.08);
     --filter-warm:sepia(.18) saturate(1.05) contrast(1.04);
 
-    /* runtime */
+    /* runtime — el tablero activo lo fija la app */
+    --sw:1280px; --sh:655px;
     --spread-scale:1;
     --image-opacity:1;
   }
@@ -134,16 +135,16 @@
   /* ══════════════ SPREAD — 1280×655 design size, scaled ══════════════ */
   .spread-frame {
     position:relative; flex:0 0 auto;
-    width:calc(1280px * var(--spread-scale));
-    height:calc(655px * var(--spread-scale));
+    width:calc(var(--sw) * var(--spread-scale));
+    height:calc(var(--sh) * var(--spread-scale));
   }
   .spread-frame > .spread-scaler {
     position:absolute; top:0; left:0;
-    width:1280px; height:655px;
+    width:var(--sw); height:var(--sh);
     transform:scale(var(--spread-scale)); transform-origin:top left;
   }
   .spread {
-    position:relative; width:1280px; height:655px; overflow:hidden;
+    position:relative; width:var(--sw); height:var(--sh); overflow:hidden;
     background:var(--surface-stage); color:var(--text-body);
     box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 40px 90px -30px rgba(0,0,0,.9);
   }
@@ -209,12 +210,12 @@
     position:relative; display:flex; align-items:center; gap:var(--space-4); list-style:none;
   }
   .ds-index-n {
-    font-family:var(--font-display); font-weight:400; font-size:15px;
+    font-family:var(--font-display); font-weight:400; font-size:var(--index-fs,15px);
     letter-spacing:var(--ls-index); color:var(--accent); min-width:2.6em; flex:0 0 auto;
   }
   .ds-index-rule { height:1px; background:var(--rule-accent); flex:0 0 auto; }
   .ds-index-label {
-    font-family:var(--font-display); font-weight:var(--fw-bold); font-size:15px;
+    font-family:var(--font-display); font-weight:var(--fw-bold); font-size:var(--index-fs,15px);
     letter-spacing:var(--ls-index); text-transform:uppercase; white-space:nowrap;
   }
   .ds-index-row.on-stage .ds-index-label { color:var(--text-strong); }
@@ -290,6 +291,8 @@
   .upload.is-prop { background-color:transparent; }
   .upload.is-prop.has-image::before { content:none; }
   .upload.is-prop .hint { font-size:9px; letter-spacing:.12em; gap:6px; }
+  /* El modo de fusión del mark de fondo lo decide la app midiendo el plato de
+     la imagen (ver autoBlend en ImageSlot), no una regla fija. */
   .upload.is-prop .hint .icon { width:26px; height:26px; font-size:15px; }
   .upload.has-image::before {
     content:""; position:absolute; inset:0; z-index:2; pointer-events:none;
@@ -427,6 +430,25 @@
     font-family:var(--mono-font); font-size:10px; color:var(--text-muted);
     margin-top:4px; line-height:1.5;
   }
+
+  /* format picker */
+  .fmt-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .fmt-card {
+    display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;
+    padding:16px 10px; background:var(--ink-800); border:1px solid var(--rule-on-stage);
+    color:var(--paper-000); font-family:inherit; text-align:center;
+    transition:border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .fmt-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .fmt-card.active { border-color:var(--accent); box-shadow:0 0 0 2px rgba(232,146,106,.28); }
+  .fmt-shape { display:block; border:1.5px solid var(--accent); }
+  .fmt-shape.landscape { width:44px; height:23px; }
+  .fmt-shape.portrait  { width:24px; height:32px; }
+  .fmt-shape.auto {
+    width:36px; height:28px; border-style:dashed;
+  }
+  .fmt-name { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .fmt-desc { font-family:var(--mono-font); font-size:9.5px; color:var(--text-muted); line-height:1.4; }
 
   /* style modal — hue, film stock, deploy */
   .swatches { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
@@ -583,7 +605,8 @@
      The spread is 1.954:1, so we print to a custom page of the same
      ratio instead of letterboxing it onto A4. */
   @media print {
-    @page { size: 338mm 173mm; margin: 0; }
+    /* El tamaño de hoja lo estampa la app en #print-page-size según el tablero. */
+    @page { margin: 0; }
     html, body {
       background:#fff !important;
       -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
@@ -593,15 +616,12 @@
     .book { gap:0 !important; }
 
     .spread-frame {
-      width:338mm !important; height:173mm !important;
       page-break-after:always !important; break-after:page !important;
       page-break-inside:avoid !important; break-inside:avoid !important;
       overflow:hidden !important; position:relative !important; max-width:none !important;
     }
     .spread-frame:last-child { page-break-after:auto !important; break-after:auto !important; }
-    .spread-frame > .spread-scaler {
-      transform:scale(calc(338mm / 1280px)) !important; transform-origin:top left !important;
-    }
+    .spread-frame > .spread-scaler { transform-origin:top left !important; }
     .spread {
       box-shadow:none !important; outline:none !important;
       -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
