@@ -958,6 +958,55 @@ function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
   );
 }
 
+// Chrome honours the @page size we stamp — a headless print of this page comes
+// out as exact 338x173mm landscape sheets. But the print dialog's Paper size
+// dropdown is sticky, and if it holds a portrait paper the browser rotates our
+// landscape page box to fit it: the kit arrives sideways with white bands. The
+// setting is one click away, so the dialog is preceded by what to check rather
+// than letting it fail silently.
+function PrintModal({ open, onClose, format }) {
+  if (!open) return null;
+  const go = () => { onClose(); setTimeout(() => window.print(), 60); };
+  const landscape = format.id === "landscape";
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="modal-inner" style={{ width: "min(620px,100%)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>pdf</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <p className="modal-hint">
+          Se abre el diálogo de impresión. Elegí <b>Guardar como PDF</b> y revisá estas tres
+          cosas, que vienen con lo último que hayas impreso:
+        </p>
+        <ol className="print-steps">
+          <li>
+            <b>Tamaño de papel</b> → <code>Personalizado</code> o el que diga{" "}
+            <code>{format.page.replace(" ", " × ")}</code>.
+            <span> Si queda un papel fijo (A4, Carta), Chrome {landscape ? "gira el spread" : "recorta la página"} para encajarlo.</span>
+          </li>
+          <li>
+            <b>Orientación</b> → <code>{landscape ? "Horizontal" : "Vertical"}</code>.
+          </li>
+          <li>
+            <b>Gráficos de fondo</b> → activado, en <i>Más configuraciones</i>. Sin esto se
+            pierden las fotos, el grano y el foil.
+          </li>
+        </ol>
+        <p className="modal-hint" style={{ marginBottom: 18 }}>
+          Estás en formato <b style={{ color: "var(--accent)" }}>{format.label.toLowerCase()}</b>,
+          así que cada spread ocupa una hoja de {format.page.replace(" ", " × ")}.
+          {landscape && " Si el diálogo te pelea, cambiá el kit a formato vertical en ● Estilo: esa hoja ya es vertical y entra sin tocar nada."}
+        </p>
+        <div className="deploy-row">
+          <button className="deploy-btn" onClick={go}>↓ Abrir diálogo de impresión</button>
+          <button className="deploy-btn" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SpreadBuilder({ open, onClose, spreads, setSpreads }) {
   if (!open) return null;
   const move = (i, dir) => {
@@ -1022,6 +1071,7 @@ function App() {
   const [showPresets, setShowPresets] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
+  const [showPrint, setShowPrint] = useState(false);
   const bookRef = useRef(null);
 
   // Hue and film stock are kit-wide, so they persist on their own keys and are
@@ -1120,7 +1170,7 @@ function App() {
         <span className="topbar-spacer" />
         <a className="tb-btn" href={window.DEPLOY.netlify} target="_blank" rel="noopener noreferrer"
            style={{ textDecoration: "none" }}>◆ Netlify</a>
-        <button className="tb-btn primary" onClick={() => window.print()}>↓ PDF</button>
+        <button className="tb-btn primary" onClick={() => setShowPrint(true)}>↓ PDF</button>
       </div>
 
       <div className={`book ${editing ? "is-editing" : ""}`} ref={bookRef}>
@@ -1131,6 +1181,7 @@ function App() {
         ))}
       </div>
 
+      <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format} />
       <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice} format={format}
         accent={accent} setAccent={setAccent}
@@ -1156,7 +1207,7 @@ function App() {
         </TweakSection>
 
         <TweakSection label="Exportar">
-          <TweakButton label="Descargar PDF" onClick={() => window.print()} />
+          <TweakButton label="Descargar PDF" onClick={() => setShowPrint(true)} />
           <div style={{ fontSize: 10, color: "#999", marginTop: 6, fontFamily: "JetBrains Mono, monospace", lineHeight: 1.5 }}>
             Imprime en hoja apaisada 338×173mm, el mismo ratio que los spreads.
             Activá "Gráficos de fondo" en el diálogo de impresión.

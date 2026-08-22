@@ -97,9 +97,17 @@ Para **importar** alcanza con el `content.json`; las fotos las toma del repo una
 
 ## Exportar a PDF
 
-**↓ PDF** abre el diálogo de impresión. La página está definida en 338×173mm — el mismo ratio 1.954:1 que los spreads — así que cada spread sale a página completa sin bandas.
+**↓ PDF** muestra qué revisar y después abre el diálogo de impresión. Elegí **Guardar como PDF**.
 
-Activá **"Gráficos de fondo"** en el diálogo, si no se pierden las fotos, el grano y el foil.
+El tamaño de hoja se declara desde la app y sigue al formato activo: **338×173mm** en horizontal y **148×263mm** en vertical, el mismo ratio que el tablero, así que cada spread ocupa una hoja completa sin bandas. Verificado imprimiendo la página: 7 páginas, ratio 1.955 y 1.776, sin rotación.
+
+Tres cosas del diálogo, que quedan pegadas de lo último que hayas impreso:
+
+1. **Tamaño de papel** → `Personalizado`, o el que coincida con la medida de arriba. **Este es el que rompe:** si queda un papel vertical fijo (A4, Carta) y estás en formato horizontal, Chrome **gira el spread 90°** para encajarlo y el PDF sale de costado con bandas blancas. No es un problema del kit — el motor genera la hoja correcta; es el papel elegido en el diálogo.
+2. **Orientación** → la del formato activo.
+3. **Gráficos de fondo** → activado, en *Más configuraciones*. Sin esto se pierden las fotos, el grano y el foil.
+
+Si el diálogo se resiste, un atajo: pasá el kit a **formato vertical** en *● Estilo*. Esa hoja ya es vertical y entra en cualquier papel sin tocar nada.
 
 ## Deploy de un click
 

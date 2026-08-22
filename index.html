@@ -431,6 +431,20 @@
     margin-top:4px; line-height:1.5;
   }
 
+  /* print guide */
+  .print-steps { margin:0 0 18px; padding:0 0 0 20px; display:flex; flex-direction:column; gap:12px; }
+  .print-steps li {
+    font-family:var(--font-body); font-size:13px; line-height:1.6;
+    color:var(--text-body); padding-left:4px;
+  }
+  .print-steps li::marker { color:var(--accent); font-weight:700; }
+  .print-steps b { color:var(--paper-000); }
+  .print-steps code {
+    font-family:var(--mono-font); font-size:11px; color:var(--accent);
+    background:rgba(232,146,106,.1); padding:1px 6px;
+  }
+  .print-steps span { display:block; margin-top:3px; font-size:11.5px; color:var(--text-muted); }
+
   /* format picker */
   .fmt-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .fmt-card {
