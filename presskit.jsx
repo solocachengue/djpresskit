@@ -28,7 +28,38 @@ const K = {
   texture: "eskay.texture.v1",
   grain:   "eskay.grain.v1",
   format:  "eskay.format.v1",
+  page:    "eskay.pagemode.v1",
 };
+
+// CSS mm→px, para calcular la escala de impresión como número puro:
+// calc() no admite dividir una longitud por otra, así que `scale(calc(338mm/1280px))`
+// era inválido y el navegador lo descartaba.
+const MM_PX = 96 / 25.4;
+
+// Dos maneras de llevar un tablero a una hoja:
+//  · "exact"  — hoja a medida del tablero. Encaje perfecto, sin bandas, pero
+//               depende de que el diálogo acepte un papel personalizado.
+//  · "a4"     — A4 con la orientación del tablero. Deja bandas, pero es un papel
+//               que todo diálogo tiene, así que nunca termina rotado.
+function printPageCss(f, mode) {
+  let pw, ph, size;
+  if (mode === "a4") {
+    const wide = f.w >= f.h;
+    pw = wide ? 297 : 210;
+    ph = wide ? 210 : 297;
+    size = wide ? "A4 landscape" : "A4 portrait";
+  } else {
+    const parts = f.page.split(" ");
+    pw = parseFloat(parts[0]); ph = parseFloat(parts[1]);
+    size = f.page;
+  }
+  const k = Math.min(pw * MM_PX / f.w, ph * MM_PX / f.h);
+  return `@media print{@page{size:${size};margin:0}` +
+    `.spread-frame{width:${pw}mm !important;height:${ph}mm !important;overflow:hidden !important}` +
+    `.spread-frame > .spread-scaler{left:50% !important;top:50% !important;` +
+    `transform:translate(-50%,-50%) scale(${k.toFixed(5)}) !important;` +
+    `transform-origin:center center !important}}`;
+}
 
 // Three layers, in precedence order:
 //   1. localStorage — edits made in THIS browser, not published yet.
@@ -449,7 +480,13 @@ function SpreadCover({ wordmark, editing, fmt }) {
   const L = window.LAYOUT.cover[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
+      {/* The cover photo was the one image slot with no brand treatment, while
+          the system allows exactly two — warm or b&w — and assumes dark,
+          tightly-shot imagery. A daylight photo dropped in here survived the
+          scrim at ~170/255 and swallowed the foil wordmark, so it now carries
+          the warm treatment and opens knocked down; ◐ raises it. */}
       <ImageSlot id="cv-hero" editing={editing} optional hintAlign="top"
+        filter="var(--filter-warm)" defaultOpacity={.6}
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
 
@@ -973,10 +1010,13 @@ function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
 // landscape page box to fit it: the kit arrives sideways with white bands. The
 // setting is one click away, so the dialog is preceded by what to check rather
 // than letting it fail silently.
-function PrintModal({ open, onClose, format }) {
+function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, setPageMode }) {
   if (!open) return null;
   const go = () => { onClose(); setTimeout(() => window.print(), 60); };
   const landscape = format.id === "landscape";
+  const sheet = pageMode === "a4"
+    ? (landscape ? "A4 horizontal (297 × 210mm)" : "A4 vertical (210 × 297mm)")
+    : format.page.replace(" ", " × ");
   return (
     <div className="modal" onClick={onClose}>
       <div className="modal-inner" style={{ width: "min(620px,100%)" }} onClick={(e) => e.stopPropagation()}>
@@ -984,29 +1024,52 @@ function PrintModal({ open, onClose, format }) {
           <h2>pdf</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <p className="modal-hint">
-          Se abre el diálogo de impresión. Elegí <b>Guardar como PDF</b> y revisá estas tres
-          cosas, que vienen con lo último que hayas impreso:
+        <div className="modal-section" style={{ marginTop: 0 }}>Formato del press kit</div>
+        <div className="fmt-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          {["landscape", "portrait"].map((id) => (
+            <button key={id} className={`fmt-card ${format.id === id ? "active" : ""}`}
+              onClick={() => setFmtChoice(id)}>
+              <span className={`fmt-shape ${id}`} aria-hidden="true" />
+              <span className="fmt-name">{window.FORMATS[id].label}</span>
+              <span className="fmt-desc">{window.FORMATS[id].w}×{window.FORMATS[id].h}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="modal-section">Hoja</div>
+        <div className="fmt-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <button className={`fmt-card ${pageMode === "exact" ? "active" : ""}`}
+            onClick={() => setPageMode("exact")}>
+            <span className="fmt-name">A medida</span>
+            <span className="fmt-desc">{format.page.replace(" ", " × ")} — encaje perfecto, sin bandas. Necesita papel personalizado en el diálogo.</span>
+          </button>
+          <button className={`fmt-card ${pageMode === "a4" ? "active" : ""}`}
+            onClick={() => setPageMode("a4")}>
+            <span className="fmt-name">A4</span>
+            <span className="fmt-desc">Deja bandas, pero es un papel que todo diálogo tiene: nunca sale rotado.</span>
+          </button>
+        </div>
+        <p className="modal-hint" style={{ marginTop: 12 }}>
+          {pageMode === "a4"
+            ? <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>. Este modo existe justamente
+              para cuando el diálogo gira el kit: al usar un papel estándar, la orientación ya coincide.</>
+            : <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>. Si el PDF te sale de
+              costado, el diálogo está imponiendo otro papel — cambiá a <b>A4</b> acá arriba y se arregla.</>}
         </p>
+
+        <div className="modal-section">En el diálogo</div>
         <ol className="print-steps">
+          <li><b>Destino</b> → <code>Guardar como PDF</code>.</li>
           <li>
-            <b>Tamaño de papel</b> → <code>Personalizado</code> o el que diga{" "}
-            <code>{format.page.replace(" ", " × ")}</code>.
-            <span> Si queda un papel fijo (A4, Carta), Chrome {landscape ? "gira el spread" : "recorta la página"} para encajarlo.</span>
+            <b>Tamaño de papel</b> → <code>{pageMode === "a4" ? "A4" : "Personalizado"}</code>
+            {pageMode === "exact" && <span>Si no te deja elegirlo, usá el modo A4 de arriba.</span>}
           </li>
+          <li><b>Orientación</b> → <code>{landscape ? "Horizontal" : "Vertical"}</code>.</li>
           <li>
-            <b>Orientación</b> → <code>{landscape ? "Horizontal" : "Vertical"}</code>.
-          </li>
-          <li>
-            <b>Gráficos de fondo</b> → activado, en <i>Más configuraciones</i>. Sin esto se
-            pierden las fotos, el grano y el foil.
+            <b>Gráficos de fondo</b> → activado, en <i>Más configuraciones</i>.
+            <span>Sin esto se pierden las fotos, el grano y el foil.</span>
           </li>
         </ol>
-        <p className="modal-hint" style={{ marginBottom: 18 }}>
-          Estás en formato <b style={{ color: "var(--accent)" }}>{format.label.toLowerCase()}</b>,
-          así que cada spread ocupa una hoja de {format.page.replace(" ", " × ")}.
-          {landscape && " Si el diálogo te pelea, cambiá el kit a formato vertical en ● Estilo: esa hoja ya es vertical y entra sin tocar nada."}
-        </p>
         <div className="deploy-row">
           <button className="deploy-btn" onClick={go}>↓ Abrir diálogo de impresión</button>
           <button className="deploy-btn" onClick={onClose}>Cancelar</button>
@@ -1089,6 +1152,8 @@ function App() {
   const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "auto"));
   const setFmtChoice = (v) => { setFmtChoiceRaw(v); saveJSON(K.format, v); };
   const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "auto")));
+  const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "exact"));
+  const setPageMode = (v) => { setPageModeRaw(v); saveJSON(K.page, v); };
 
   const [social, setSocialRaw] = useState(() => loadJSON(K.social, activePreset().social || []));
   const setSocial = (next) => { setSocialRaw(next); saveJSON(K.social, next); };
@@ -1121,21 +1186,27 @@ function App() {
       root.style.setProperty("--sw", f.w + "px");
       root.style.setProperty("--sh", f.h + "px");
       const w = el.clientWidth;
-      if (w > 0) root.style.setProperty("--spread-scale", String(Math.min(f.maxScale, w / f.w)));
+      if (w > 0) {
+        const k = Math.min(f.maxScale, w / f.w);
+        root.style.setProperty("--spread-scale", String(k));
+        // scale(1) still promotes the spread to its own compositing layer, and a
+        // blended layer captured mid-raster can show the previous raster under
+        // the current one — a ghost of the content offset behind itself. At
+        // exactly 1 there is nothing to scale, so the layer is not created.
+        root.style.setProperty("--spread-transform", k === 1 ? "none" : `scale(${k})`);
+      }
       // @page can't read a custom property, so the print sheet is stamped into
       // its own style element and follows whichever board is on screen.
       let tag = document.getElementById("print-page-size");
       if (!tag) { tag = document.createElement("style"); tag.id = "print-page-size"; document.head.appendChild(tag); }
-      tag.textContent = `@media print{@page{size:${f.page};margin:0}` +
-        `.spread-frame{width:${f.page.split(" ")[0]} !important;height:${f.page.split(" ")[1]} !important}` +
-        `.spread-frame > .spread-scaler{transform:scale(calc(${f.page.split(" ")[0]} / ${f.w}px)) !important}}`;
+      tag.textContent = printPageCss(f, pageMode);
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     window.addEventListener("resize", fit);
     return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
-  }, [fmtChoice]);
+  }, [fmtChoice, pageMode]);
 
   // The wordmark shown in the chrome must follow the EDITED name, not the
   // preset's: a published kit renamed to another artist was still labelled
@@ -1190,7 +1261,9 @@ function App() {
         ))}
       </div>
 
-      <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format} />
+      <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format}
+        fmtChoice={fmtChoice} setFmtChoice={setFmtChoice}
+        pageMode={pageMode} setPageMode={setPageMode} />
       <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice} format={format}
         accent={accent} setAccent={setAccent}
@@ -1248,6 +1321,20 @@ async function boot() {
     // Sin archivo publicado todavía: se usan los defaults del preset.
   }
   window.__PUBLISHED = published || {};
+
+  // Nothing is painted until the display face is in. Every measurement in the
+  // kit — the index rows, the justified bio, the wordmark — is set in that
+  // face, so a first paint in the fallback lays the spread out at different
+  // metrics and then reflows. Both paints could end up composited at once,
+  // which is what the duplicated "they trust" was: one ghost in the fallback
+  // font under the real one, not a duplicated element.
+  if (document.fonts && document.fonts.ready) {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise((r) => setTimeout(r, 3000)),   // no dejar la página en blanco si la fuente no llega
+    ]);
+  }
+
   ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 }
 

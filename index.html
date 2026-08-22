@@ -23,7 +23,7 @@
 </template>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500;700&display=block" rel="stylesheet">
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
@@ -110,6 +110,7 @@
     /* runtime — el tablero activo lo fija la app */
     --sw:1280px; --sh:655px;
     --spread-scale:1;
+    --spread-transform:none;
     --image-opacity:1;
   }
 
@@ -141,9 +142,15 @@
   .spread-frame > .spread-scaler {
     position:absolute; top:0; left:0;
     width:var(--sw); height:var(--sh);
-    transform:scale(var(--spread-scale)); transform-origin:top left;
+    transform:var(--spread-transform, scale(var(--spread-scale))); transform-origin:top left;
   }
   .spread {
+    /* The grain blends with its backdrop. Without an explicit isolation group
+       the browser may blend against a cached snapshot of the spread taken
+       before the webfont swapped in, painting a ghost of the content at
+       fallback-font metrics on top of the real thing. Isolating pins the blend
+       to this spread's own content. */
+    isolation:isolate;
     position:relative; width:var(--sw); height:var(--sh); overflow:hidden;
     background:var(--surface-stage); color:var(--text-body);
     box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 40px 90px -30px rgba(0,0,0,.9);
