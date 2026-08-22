@@ -58,15 +58,25 @@ El puente es un archivo `content.json`. El contenido se resuelve en tres capas, 
 El flujo completo:
 
 1. Editá todo lo que quieras.
-2. **◆ Contenido → Exportar `content.json`**.
-3. Poné el archivo en la raíz del repo y hacé push.
-4. Netlify o Vercel redeployan solos, y tu URL ya muestra **tu** press kit — en cualquier navegador y para cualquiera.
+2. **◆ Contenido → Exportar**.
+3. Descomprimí el zip **encima del repo**, respetando las carpetas.
+4. Push. Netlify o Vercel redeployan solos, y tu URL ya muestra **tu** press kit — en cualquier navegador y para cualquiera.
 
 **Importar** hace el camino inverso: cargás un `content.json` y recuperás ese kit en el navegador que sea. Sirve para seguir editando desde otra compu o para pasarle el kit a otra persona.
 
 Si no hay `content.json` en el repo, la app usa el preset. Es el caso normal de un clon recién hecho.
 
-Las fotos que subís se guardan dentro del archivo, así que el peso crece con ellas: sin fotos propias son unos pocos KB, con varias puede llegar a algunos MB. Si se pone muy pesado, guardá las fotos como archivos en `assets/` y apuntá los slots ahí.
+**Qué te bajás.** Si no subiste fotos propias, un `content.json` suelto de unos pocos KB. Si subiste, un `presskit-content.zip` con esta forma:
+
+```
+content.json                    ← en la raíz del repo
+assets/kit-so-portrait.jpg      ← una por cada foto que subiste
+assets/kit-st-portrait.jpg
+```
+
+Las fotos **no** van embebidas en el JSON: salen como archivos y el JSON se queda solo con sus rutas. Así el texto pesa unos KB, las imágenes conservan su tamaño natural en vez de inflarse un tercio en base64, y el CDN las cachea por separado en lugar de rebajar todo el contenido cada vez que cambiás una palabra.
+
+Para **importar** alcanza con el `content.json`; las fotos las toma del repo una vez desplegado.
 
 ## Exportar a PDF
 

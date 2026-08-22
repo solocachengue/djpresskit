@@ -101,17 +101,121 @@ function collectContent() {
   };
 }
 
-const contentSize = (obj) => new Blob([JSON.stringify(obj)]).size;
 const prettySize = (b) => b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
 
-function exportContent() {
+// ── Minimal ZIP writer (store, no compression) ──────────────────────────────
+// Photos are already compressed — JPEG and PNG both — so deflating them would
+// buy nothing and cost a CDN dependency. Storing them uncompressed keeps this
+// to a few dozen lines and the bundle to the size of its parts.
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipFiles(files) {
+  const enc = new TextEncoder();
+  const u16 = (n) => [n & 255, (n >>> 8) & 255];
+  const u32 = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  const chunks = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const local = new Uint8Array([
+      0x50, 0x4b, 0x03, 0x04, ...u16(20), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0),                                  // hora y fecha: fijas, el zip es reproducible
+      ...u32(crc), ...u32(f.data.length), ...u32(f.data.length),
+      ...u16(name.length), ...u16(0),
+    ]);
+    chunks.push(local, name, f.data);
+    central.push({ name, crc, size: f.data.length, offset });
+    offset += local.length + name.length + f.data.length;
+  }
+  const cdStart = offset;
+  for (const e of central) {
+    const h = new Uint8Array([
+      0x50, 0x4b, 0x01, 0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0),
+      ...u32(e.crc), ...u32(e.size), ...u32(e.size),
+      ...u16(e.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0),
+      ...u32(e.offset),
+    ]);
+    chunks.push(h, e.name);
+    offset += h.length + e.name.length;
+  }
+  chunks.push(new Uint8Array([
+    0x50, 0x4b, 0x05, 0x06, ...u16(0), ...u16(0),
+    ...u16(central.length), ...u16(central.length),
+    ...u32(offset - cdStart), ...u32(cdStart), ...u16(0),
+  ]));
+  return new Blob(chunks, { type: "application/zip" });
+}
+
+const MIME_EXT = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
+
+function dataUrlToBytes(url) {
+  const comma = url.indexOf(",");
+  const mime = (url.slice(0, comma).match(/data:([^;]+)/) || [])[1] || "image/png";
+  const bin = atob(url.slice(comma + 1));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return { bytes: out, ext: MIME_EXT[mime] || "png" };
+}
+
+// Uploaded photos leave the JSON and become real files under assets/, with the
+// JSON keeping only their paths. A kit with photos stays a few KB of text plus
+// the images at their natural size, instead of one base64 blob a third larger
+// than the originals that no CDN can cache separately.
+function buildExport() {
   const data = collectContent();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const images = data[K.images] || {};
+  const files = [];
+  const paths = {};
+  for (const slot of Object.keys(images)) {
+    const val = images[slot];
+    if (typeof val === "string" && val.startsWith("data:")) {
+      const { bytes, ext } = dataUrlToBytes(val);
+      const name = `assets/kit-${slot}.${ext}`;
+      files.push({ name, data: bytes });
+      paths[slot] = name;
+    } else {
+      paths[slot] = val;
+    }
+  }
+  data[K.images] = paths;
+  const json = new TextEncoder().encode(JSON.stringify(data, null, 2));
+  const photoBytes = files.reduce((n, f) => n + f.data.length, 0);
+  return { data, files, json, photos: files.length, bytes: json.length + photoBytes };
+}
+
+function saveBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "content.json";
+  a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportContent() {
+  const { files, json, photos } = buildExport();
+  // With no uploaded photos there is nothing to bundle, so ship the bare file
+  // rather than making someone unzip an archive holding one JSON.
+  if (photos === 0) {
+    saveBlob(new Blob([json], { type: "application/json" }), "content.json");
+    return;
+  }
+  saveBlob(zipFiles([{ name: "content.json", data: json }, ...files]), "presskit-content.zip");
 }
 
 function importContent(file, onDone) {
@@ -566,8 +670,12 @@ function SpreadBack({ wordmark, editing }) {
 // ═══════════════════════════════════════════════════════════════════════════
 function PresetModal({ open, onClose, currentId }) {
   const fileRef = useRef(null);
-  const [size, setSize] = useState(0);
-  useEffect(() => { if (open) setSize(contentSize(collectContent())); }, [open]);
+  const [info, setInfo] = useState({ bytes: 0, photos: 0 });
+  useEffect(() => {
+    if (!open) return;
+    const { bytes, photos } = buildExport();
+    setInfo({ bytes, photos });
+  }, [open]);
   if (!open) return null;
   const published = window.__PUBLISHED && Object.keys(window.__PUBLISHED).length > 0;
   return (
@@ -605,16 +713,25 @@ function PresetModal({ open, onClose, currentId }) {
         <div className="modal-section">Llevarte los cambios</div>
         <p className="modal-hint" style={{ marginBottom: 16 }}>
           Lo que editás se guarda en <b>este navegador</b>. Para que tu press kit viaje
-          — a otra compu, a tu sitio publicado, o a quien le pases el link — exportá un
-          <code> content.json</code>, ponelo en la raíz del repo y hacé push. La app lo lee
-          al cargar y lo usa como contenido base.{" "}
+          — a otra compu, a tu sitio publicado, o a quien le pases el link — exportalo,
+          descomprimilo en la raíz del repo y hacé push. La app lee el
+          <code> content.json</code> al cargar y lo usa como contenido base.{" "}
           {published
             ? <b style={{ color: "var(--accent)" }}>Este sitio ya está cargando un content.json publicado.</b>
             : "Todavía no hay ninguno publicado, así que se ven los valores del preset."}
         </p>
+        <p className="modal-hint" style={{ marginBottom: 16 }}>
+          {info.photos > 0
+            ? <>Tenés <b>{info.photos}</b> {info.photos === 1 ? "foto propia" : "fotos propias"}. Salen como
+              archivos sueltos en <code>assets/</code> y el JSON se queda solo con las rutas, así
+              que el kit no engorda: se baja un <code>.zip</code> con todo adentro.</>
+            : <>No subiste fotos propias todavía, así que se baja un <code>content.json</code> solo.
+              Cuando subas alguna, el export pasa a ser un <code>.zip</code> con las fotos en <code>assets/</code>.</>}
+        </p>
         <div className="deploy-row">
           <button className="deploy-btn" onClick={exportContent}>
-            ↓ Exportar content.json <span style={{ color: "var(--text-muted)" }}>({prettySize(size)})</span>
+            ↓ Exportar {info.photos > 0 ? "kit (.zip)" : "content.json"}{" "}
+            <span style={{ color: "var(--text-muted)" }}>({prettySize(info.bytes)})</span>
           </button>
           <button className="deploy-btn" onClick={() => fileRef.current && fileRef.current.click()}>
             ↑ Importar content.json
@@ -623,9 +740,9 @@ function PresetModal({ open, onClose, currentId }) {
             onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) importContent(f); }} />
         </div>
         <p className="modal-hint" style={{ marginTop: 14, marginBottom: 0 }}>
-          Las fotos que subís van dentro del archivo, así que el tamaño crece con ellas.
-          Si se pone muy pesado, guardá las fotos como archivos en <code>assets/</code> y
-          apuntá los slots ahí.
+          El zip trae <code>content.json</code> en la raíz y las fotos en <code>assets/</code>:
+          descomprimilo <b>encima del repo</b> respetando las carpetas. Para importar alcanza
+          con el <code>content.json</code>; las fotos las toma del repo una vez desplegado.
         </p>
       </div>
     </div>
