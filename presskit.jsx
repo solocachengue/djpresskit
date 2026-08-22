@@ -29,7 +29,23 @@ const K = {
   grain:   "eskay.grain.v1",
 };
 
-const loadJSON = (k, f) => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : f; } catch { return f; } };
+// Three layers, in precedence order:
+//   1. localStorage — edits made in THIS browser, not published yet.
+//   2. content.json — the published kit, committed to the repo and deployed.
+//      This is what makes a kit portable: without it, edits live only in the
+//      browser that made them, so a deployed copy always showed the template.
+//   3. the preset — the built-in defaults.
+// window.__PUBLISHED is filled in by boot() before the first render, so every
+// component can keep reading its initial value synchronously at mount.
+const loadJSON = (k, f) => {
+  try {
+    const s = localStorage.getItem(k);
+    if (s != null) return JSON.parse(s);
+  } catch {}
+  const pub = window.__PUBLISHED;
+  if (pub && pub[k] !== undefined) return pub[k];
+  return f;
+};
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const loadText  = () => loadJSON(K.text, {});
 const saveText  = (t) => saveJSON(K.text, t);
@@ -53,6 +69,68 @@ function applyPreset(id) {
   saveJSON(K.social, p.social);
   try { localStorage.removeItem(K.spreads); } catch {}
   location.reload();
+}
+
+// ── Portable content ────────────────────────────────────────────────────────
+// Gathers the EFFECTIVE state — what the kit actually shows right now, with
+// preset defaults already folded in — rather than only the keys this browser
+// happens to have touched. Exporting a kit you never edited must still produce
+// a complete, self-contained file.
+const CONTENT_FORMAT = "djpresskit/content@1";
+
+function collectContent() {
+  const p = activePreset();
+  const storedText = (() => { try { return JSON.parse(localStorage.getItem(K.text)) || {}; } catch { return {}; } })();
+  const storedImgs = (() => { try { return JSON.parse(localStorage.getItem(K.images)) || {}; } catch { return {}; } })();
+  return {
+    __format: CONTENT_FORMAT,
+    __savedAt: new Date().toISOString(),
+    [K.preset]:  loadJSON(K.preset, "eskay"),
+    // Merge over the preset so the file stands on its own.
+    [K.text]:    { ...p.text, ...(window.__PUBLISHED?.[K.text] || {}), ...storedText },
+    [K.images]:  { ...p.images, ...p.sharedImages, ...(window.__PUBLISHED?.[K.images] || {}), ...storedImgs },
+    [K.genres]:  loadJSON(K.genres, p.genres),
+    [K.creds]:   loadJSON(K.creds, p.credentials),
+    [K.venues]:  loadJSON(K.venues, p.venues),
+    [K.social]:  loadJSON(K.social, p.social),
+    [K.spreads]: loadJSON(K.spreads, [...DEFAULT_SPREADS]),
+    [K.opacity]: loadJSON(K.opacity, {}),
+    [K.accent]:  loadJSON(K.accent, window.ACCENT_DEFAULT),
+    [K.texture]: loadJSON(K.texture, window.TEXTURE_DEFAULT),
+    [K.grain]:   loadJSON(K.grain, window.GRAIN_DEFAULT),
+  };
+}
+
+const contentSize = (obj) => new Blob([JSON.stringify(obj)]).size;
+const prettySize = (b) => b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
+
+function exportContent() {
+  const data = collectContent();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "content.json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function importContent(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch { return alert("Ese archivo no es un JSON válido."); }
+    if (!data || data.__format !== CONTENT_FORMAT) {
+      return alert("Ese archivo no parece un content.json de este press kit.");
+    }
+    Object.keys(data).forEach((k) => {
+      if (k.startsWith("__")) return;
+      try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
+    });
+    onDone && onDone();
+    location.reload();
+  };
+  reader.readAsText(file);
 }
 
 // ── Editable text ───────────────────────────────────────────────────────────
@@ -449,7 +527,11 @@ function SpreadBack({ wordmark, editing }) {
         filter="var(--filter-warm) brightness(.9)" objectPosition="46% 30%"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-left)", zIndex: 1 }} />
-      <GhostWord size={190} opacity={.14} style={{ top: "50%", transform: "translateY(-50%)", left: 60 }}>
+      {/* Clears the torn-paper wedge, which reaches ~348px into the spread at
+          this vertical band. Starting further left let the wedge swallow the
+          front of the name — "hardwell" read as "dwell". The ghost is meant to
+          be clipped by the artboard edge on the right, not by the collage. */}
+      <GhostWord size={190} opacity={.14} style={{ top: "50%", transform: "translateY(-50%)", left: 372 }}>
         <Editable id="bk-ghost" fallback={wordmark} />
       </GhostWord>
 
@@ -483,7 +565,11 @@ function SpreadBack({ wordmark, editing }) {
 // MODALS
 // ═══════════════════════════════════════════════════════════════════════════
 function PresetModal({ open, onClose, currentId }) {
+  const fileRef = useRef(null);
+  const [size, setSize] = useState(0);
+  useEffect(() => { if (open) setSize(contentSize(collectContent())); }, [open]);
   if (!open) return null;
+  const published = window.__PUBLISHED && Object.keys(window.__PUBLISHED).length > 0;
   return (
     <div className="modal" onClick={onClose}>
       <div className="modal-inner" onClick={(e) => e.stopPropagation()}>
@@ -515,6 +601,32 @@ function PresetModal({ open, onClose, currentId }) {
             </button>
           ))}
         </div>
+
+        <div className="modal-section">Llevarte los cambios</div>
+        <p className="modal-hint" style={{ marginBottom: 16 }}>
+          Lo que editás se guarda en <b>este navegador</b>. Para que tu press kit viaje
+          — a otra compu, a tu sitio publicado, o a quien le pases el link — exportá un
+          <code> content.json</code>, ponelo en la raíz del repo y hacé push. La app lo lee
+          al cargar y lo usa como contenido base.{" "}
+          {published
+            ? <b style={{ color: "var(--accent)" }}>Este sitio ya está cargando un content.json publicado.</b>
+            : "Todavía no hay ninguno publicado, así que se ven los valores del preset."}
+        </p>
+        <div className="deploy-row">
+          <button className="deploy-btn" onClick={exportContent}>
+            ↓ Exportar content.json <span style={{ color: "var(--text-muted)" }}>({prettySize(size)})</span>
+          </button>
+          <button className="deploy-btn" onClick={() => fileRef.current && fileRef.current.click()}>
+            ↑ Importar content.json
+          </button>
+          <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) importContent(f); }} />
+        </div>
+        <p className="modal-hint" style={{ marginTop: 14, marginBottom: 0 }}>
+          Las fotos que subís van dentro del archivo, así que el tamaño crece con ellas.
+          Si se pone muy pesado, guardá las fotos como archivos en <code>assets/</code> y
+          apuntá los slots ahí.
+        </p>
       </div>
     </div>
   );
@@ -715,7 +827,10 @@ function App() {
     return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
   }, []);
 
-  const wordmark = activePreset().wordmark;
+  // The wordmark shown in the chrome must follow the EDITED name, not the
+  // preset's: a published kit renamed to another artist was still labelled
+  // "eskaydareal" in the top bar.
+  const wordmark = loadText()["cv-wordmark"] || activePreset().wordmark;
 
   const resetAll = () => {
     if (!confirm("¿Borrar todo lo editado y volver al contenido del preset?")) return;
@@ -803,4 +918,24 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+// content.json is fetched BEFORE the first render, not after: every editable
+// reads its initial value once at mount, so arriving late would leave the page
+// showing the template until a reload. A missing file is the normal case for a
+// fresh clone — it just means "no published content yet".
+async function boot() {
+  let published = null;
+  try {
+    const res = await fetch("content.json", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.__format === CONTENT_FORMAT) published = data;
+      else console.warn("[presskit] content.json ignorado: formato desconocido");
+    }
+  } catch (e) {
+    // Sin archivo publicado todavía: se usan los defaults del preset.
+  }
+  window.__PUBLISHED = published || {};
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+}
+
+boot();

@@ -43,7 +43,30 @@ El botón **● Estilo** en la barra abre los controles de marca.
 
 Los props que quedan vacíos simplemente desaparecen del spread — nunca sale un placeholder punteado en el PDF.
 
-Todo se guarda en el `localStorage` del navegador, así que cada persona que abre el sitio tiene su propia versión.
+Todo se guarda en el `localStorage` del navegador mientras editás. Para que los cambios salgan de tu navegador, mirá la sección siguiente.
+
+## Llevarte los cambios (publicar tu contenido)
+
+Lo que editás vive en tu navegador. Eso alcanza para exportar un PDF, pero **no** para publicar: si deployás sin más, tu sitio muestra el contenido del template, y quien abra tu link no ve lo tuyo.
+
+El puente es un archivo `content.json`. El contenido se resuelve en tres capas, de mayor a menor prioridad:
+
+1. **`localStorage`** — lo que estás editando en este navegador, sin publicar.
+2. **`content.json`** — el kit publicado, commiteado en el repo. Es lo que ve cualquier visitante.
+3. **El preset** — los valores por defecto.
+
+El flujo completo:
+
+1. Editá todo lo que quieras.
+2. **◆ Contenido → Exportar `content.json`**.
+3. Poné el archivo en la raíz del repo y hacé push.
+4. Netlify o Vercel redeployan solos, y tu URL ya muestra **tu** press kit — en cualquier navegador y para cualquiera.
+
+**Importar** hace el camino inverso: cargás un `content.json` y recuperás ese kit en el navegador que sea. Sirve para seguir editando desde otra compu o para pasarle el kit a otra persona.
+
+Si no hay `content.json` en el repo, la app usa el preset. Es el caso normal de un clon recién hecho.
+
+Las fotos que subís se guardan dentro del archivo, así que el peso crece con ellas: sin fotos propias son unos pocos KB, con varias puede llegar a algunos MB. Si se pone muy pesado, guardá las fotos como archivos en `assets/` y apuntá los slots ahí.
 
 ## Exportar a PDF
 
@@ -77,6 +100,7 @@ O `npm start`, que corre `npx serve .`.
 - `presskit.jsx` — los siete spreads, la infraestructura de edición y la app.
 - `tweaks-panel.jsx` — panel flotante de ajustes.
 - `assets/` — fotos, props y texturas del kit original.
+- `content.json` — *(opcional, lo generás vos)* el contenido publicado. Si existe, la app lo usa como base.
 
 ## El design system, en corto
 
