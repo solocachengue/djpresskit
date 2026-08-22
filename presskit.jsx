@@ -387,11 +387,9 @@ function IndexEditor({ storageKey, presetKey, tone = "on-stage", ruleWidth = 120
   );
 }
 
-// Editable social links, shared by the row (spread 03) and the rail (05, 07).
-function useSocial() {
-  const [items, setItems] = useState(() => loadJSON(K.social, activePreset().social || []));
-  return [items, (next) => { setItems(next); saveJSON(K.social, next); }];
-}
+// The social list feeds three spreads — the row on 03 and the rails on 05 and
+// 07 — so it lives in App and comes down as a prop. Editing it in one place
+// has to update all three without a reload.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SPREAD 01 — COVER
@@ -470,8 +468,7 @@ function SpreadStory({ editing }) {
 // SPREAD 03 — SOCIAL MEDIA
 // Full-bleed b&w portrait, giant ghosted wordmark, contact row.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadSocial({ editing }) {
-  const [social] = useSocial();
+function SpreadSocial({ editing, social }) {
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
       <ImageSlot id="so-portrait" editing={editing}
@@ -545,8 +542,7 @@ function SpreadMusic({ editing }) {
 // SPREAD 05 — DEGREE & SKILLS / EVOLUTION
 // Credentials index on paper, partner marks bottom-left, social rail right.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadSkills({ editing }) {
-  const [social] = useSocial();
+function SpreadSkills({ editing, social }) {
   return (
     <div className="spread" style={{ background: "var(--paper-100)" }}>
       <div className="grain grain--paper" />
@@ -623,8 +619,7 @@ function SpreadTrust({ editing }) {
 // SPREAD 07 — BACK COVER
 // Torn-paper collage splitting the composition on a diagonal.
 // ═══════════════════════════════════════════════════════════════════════════
-function SpreadBack({ wordmark, editing }) {
-  const [social] = useSocial();
+function SpreadBack({ wordmark, editing, social }) {
   return (
     <div className="spread" style={{ background: "var(--ink-900)" }}>
       <ImageSlot id="bk-photo" editing={editing}
@@ -668,7 +663,7 @@ function SpreadBack({ wordmark, editing }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // MODALS
 // ═══════════════════════════════════════════════════════════════════════════
-function PresetModal({ open, onClose, currentId }) {
+function PresetModal({ open, onClose, currentId, social, setSocial }) {
   const fileRef = useRef(null);
   const [info, setInfo] = useState({ bytes: 0, photos: 0 });
   useEffect(() => {
@@ -709,6 +704,39 @@ function PresetModal({ open, onClose, currentId }) {
             </button>
           ))}
         </div>
+
+        <div className="modal-section">Links y redes</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          Una sola lista alimenta los tres spreads que muestran contacto: la fila de
+          <i> social media</i>, y los rieles verticales de <i>degree &amp; skills</i> y la
+          contratapa. El texto se ve solo en la fila; en los rieles el ícono va solo.
+        </p>
+        <div className="link-list">
+          {social.map((it, i) => (
+            <div className="link-row" key={i}>
+              <span className="link-icon"><Icon name={it.icon} size={20} /></span>
+              <select value={it.icon}
+                onChange={(e) => setSocial(social.map((x, j) => j === i ? { ...x, icon: e.target.value } : x))}>
+                {window.ICON_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+              <input value={it.label} placeholder="@handle o texto" spellCheck={false}
+                onChange={(e) => setSocial(social.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+              <input value={it.href} placeholder="https://..." spellCheck={false}
+                onChange={(e) => setSocial(social.map((x, j) => j === i ? { ...x, href: e.target.value } : x))} />
+              <span className="link-ctrl">
+                <button onClick={() => { if (i === 0) return; const n = [...social]; [n[i-1], n[i]] = [n[i], n[i-1]]; setSocial(n); }}
+                  disabled={i === 0} title="Subir">↑</button>
+                <button onClick={() => { if (i === social.length - 1) return; const n = [...social]; [n[i], n[i+1]] = [n[i+1], n[i]]; setSocial(n); }}
+                  disabled={i === social.length - 1} title="Bajar">↓</button>
+                <button className="danger" onClick={() => setSocial(social.filter((_, j) => j !== i))} title="Quitar">✕</button>
+              </span>
+            </div>
+          ))}
+        </div>
+        <button className="add-row" style={{ marginTop: 12 }}
+          onClick={() => setSocial([...social, { icon: "instagram", label: "@usuario", href: "https://instagram.com/usuario" }])}>
+          + Agregar link
+        </button>
 
         <div className="modal-section">Llevarte los cambios</div>
         <p className="modal-hint" style={{ marginBottom: 16 }}>
@@ -912,6 +940,9 @@ function App() {
 
   // Hue and film stock are kit-wide, so they persist on their own keys and are
   // reapplied on every mount — a reload must not silently revert the look.
+  const [social, setSocialRaw] = useState(() => loadJSON(K.social, activePreset().social || []));
+  const setSocial = (next) => { setSocialRaw(next); saveJSON(K.social, next); };
+
   const [accent, setAccentRaw] = useState(() => loadJSON(K.accent, window.ACCENT_DEFAULT));
   const [texture, setTextureRaw] = useState(() => loadJSON(K.texture, window.TEXTURE_DEFAULT));
   const [grain, setGrainRaw] = useState(() => loadJSON(K.grain, window.GRAIN_DEFAULT));
@@ -956,7 +987,7 @@ function App() {
   };
 
   const renderSpread = (id, i) => {
-    const props = { editing, wordmark, key: `${id}-${i}` };
+    const props = { editing, wordmark, social, key: `${id}-${i}` };
     switch (id) {
       case "cover":  return <SpreadCover {...props} />;
       case "story":  return <SpreadStory {...props} />;
@@ -1001,7 +1032,8 @@ function App() {
         accent={accent} setAccent={setAccent}
         texture={texture} setTexture={setTexture}
         grain={grain} setGrain={setGrain} />
-      <PresetModal open={showPresets} onClose={() => setShowPresets(false)} currentId={preset.id} />
+      <PresetModal open={showPresets} onClose={() => setShowPresets(false)} currentId={preset.id}
+        social={social} setSocial={setSocial} />
       <SpreadBuilder open={showBuilder} onClose={() => setShowBuilder(false)}
         spreads={spreads} setSpreads={setSpreads} />
 

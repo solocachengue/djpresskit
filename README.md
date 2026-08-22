@@ -39,6 +39,7 @@ El botón **● Estilo** en la barra abre los controles de marca.
 
 - **Textos** — click en cualquier texto con el modo **✎ Editar** activo. Títulos, eyebrows, bio, handles, footlines.
 - **Listas numeradas** — géneros, credenciales y venues se agregan, editan y borran fila por fila.
+- **Links y redes** — en **◆ Contenido → Links y redes**. Una sola lista alimenta los tres spreads que muestran contacto: la fila de *social media* y los rieles verticales de *degree & skills* y la contratapa. De cada link editás plataforma, texto y URL, y podés agregar, reordenar y borrar. El texto se ve solo en la fila; en los rieles va el ícono solo.
 - **Imágenes** — *todas*. No hay ninguna imagen soldada al layout: retratos, cover art, foto de venue, y también los props de marca (auriculares, vinilo, sticker die-cut, sprays de spray-paint, logos de partners). Click en cualquiera para reemplazarla, `◐` para regular el brillo, `✕` para vaciarla.
 
 Los props que quedan vacíos simplemente desaparecen del spread — nunca sale un placeholder punteado en el PDF.
