@@ -272,7 +272,8 @@ function Editable({ tag = "span", id, fallback = "", className, style, multiline
 // must never reach the printed PDF.
 function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
                     filter, objectPosition, fit = "cover", mode = "bg",
-                    optional = false, autoBlend = false, defaultOpacity = 1, children }) {
+                    optional = false, autoBlend = false, defaultOpacity = 1,
+                    hintAlign = "center", children }) {
   const presetSrc = (() => {
     const p = activePreset();
     return (p.images && p.images[id]) || (p.sharedImages && p.sharedImages[id]) || null;
@@ -361,7 +362,15 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
                    display: "block", filter: filter || undefined, opacity,
                    mixBlendMode: blend || undefined, pointerEvents: "none" }} />
       )}
-      <div className="hint"><div className="icon">+</div><div>{label}</div></div>
+      {/* The cover stacks a full-bleed slot, a centred mark and a centred prop.
+          Centring every hint puts three labels on the same spot, so each one
+          is anchored where the others are not. */}
+      <div className={`hint align-${hintAlign}`}><div className="icon">+</div><div>{label}</div></div>
+      {/* Once a slot holds a picture its hint disappears, and the cover stacks
+          three of them — full-bleed photo, background mark, prop — on the same
+          centre. Without a name on each, there is no way to tell which one you
+          are about to replace. */}
+      {src && editing && <span className="slot-badge">{label}</span>}
       {children}
       {src && editing && (
         <>
@@ -440,7 +449,7 @@ function SpreadCover({ wordmark, editing, fmt }) {
   const L = window.LAYOUT.cover[fmt];
   return (
     <div className="spread" style={{ background: "var(--ink-800)" }}>
-      <ImageSlot id="cv-hero" editing={editing} optional
+      <ImageSlot id="cv-hero" editing={editing} optional hintAlign="top"
         style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, background: "var(--scrim-full)", zIndex: 1 }} />
 
@@ -449,7 +458,7 @@ function SpreadCover({ wordmark, editing, fmt }) {
           delivered on an opaque black plate — most DJ logos are — drops its
           background instead of stamping a visible box on the stage. */}
       <ImageSlot id="cv-mark" editing={editing} optional mode="img" fit="contain" autoBlend
-        defaultOpacity={.5}
+        defaultOpacity={.5} hintAlign="bottom"
         style={{ position: "absolute", left: "50%", top: "48%",
                  transform: "translate(-50%,-50%)",
                  width: fmt === "portrait" ? 330 : 780,

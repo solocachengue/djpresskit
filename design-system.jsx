@@ -305,9 +305,9 @@ const DEFAULT_SPREADS = ["cover", "story", "social", "music", "skills", "trust",
 // drop zones ("Drop the hero press shot"), and no Hardwell assets exist. Using
 // Eskay's portraits under Hardwell's name would be a lie about whose face it is.
 const IMAGE_SLOTS = {
-  "cv-hero":     { hint: "foto de portada a sangre" },
-  "cv-prop":     { hint: "prop de portada (PNG sin fondo)" },
-  "cv-mark":     { hint: "marca de fondo (grande, atrás)" },
+  "cv-hero":     { hint: "fondo a sangre — foto gigante detrás de todo" },
+  "cv-prop":     { hint: "prop chico — objeto sobre el wordmark" },
+  "cv-mark":     { hint: "marca de fondo — logo grande detrás del wordmark" },
   "st-portrait": { hint: "retrato cálido" },
   "st-spray":    { hint: "textura / spray" },
   "st-sticker":  { hint: "sticker die-cut" },
