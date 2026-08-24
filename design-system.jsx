@@ -139,7 +139,11 @@ function SocialRail({ items, size = 22, gap = 46, style }) {
 const FORMATS = {
   landscape: {
     id: "landscape", label: "Horizontal", w: 1280, h: 655,
-    page: "338mm 173mm", maxScale: 1,
+    // 297mm is A4's long side. A custom sheet wider than that is refused by
+    // many print dialogs, which silently swap in a standard paper — and then
+    // the frame overflows it and the spread is cut. Keeping the long side
+    // within A4 makes the custom sheet one the dialog will actually accept.
+    page: "297mm 152mm", maxScale: 1,
     desc: "El spread del kit original, 1.95:1",
   },
   portrait: {
