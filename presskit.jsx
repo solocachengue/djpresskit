@@ -386,9 +386,17 @@ async function buildStandalone(onStep) {
 
   step("Compilando…");
   const opts = { presets: ["react"] };
-  const dsJs = window.Babel.transform(dsSrc, opts).code;
-  const kitJs = window.Babel.transform(kitSrc, opts).code;
-  const twkJs = window.Babel.transform(await fetchText("tweaks-panel.jsx"), opts).code;
+  // Each file is wrapped in its own function. Separate <script> tags share one
+  // top-level lexical scope, and these files legitimately declare the same
+  // names — design-system.jsx defines `const Icon`, presskit.jsx destructures
+  // `const { Icon } = window` — which collides into "Identifier 'Icon' has
+  // already been declared" and kills every script after it, leaving a blank
+  // page. Babel isolates them on the live page; here they have to be isolated
+  // explicitly. What they share, they share through window, as they already did.
+  const isolate = (js) => `(function(){\n${js}\n})();`;
+  const dsJs = isolate(window.Babel.transform(dsSrc, opts).code);
+  const kitJs = isolate(window.Babel.transform(kitSrc, opts).code);
+  const twkJs = isolate(window.Babel.transform(await fetchText("tweaks-panel.jsx"), opts).code);
 
   const title = (data[K.text] && data[K.text]["cv-wordmark"]) || activePreset().wordmark;
   step("Armando el archivo…");
