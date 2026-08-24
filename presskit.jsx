@@ -1168,11 +1168,14 @@ function App() {
 
   // Hue and film stock are kit-wide, so they persist on their own keys and are
   // reapplied on every mount — a reload must not silently revert the look.
-  // "auto" serves the portrait board on narrow viewports; an explicit choice wins.
-  const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "auto"));
+  // Vertical is the default board and a sheet cut to it the default paper: that
+  // pair prints edge to edge with no bands, and its 148x263mm sheet is small
+  // enough that print dialogs actually create it. "auto" stays available and
+  // still serves the portrait board on narrow viewports.
+  const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "portrait"));
   const setFmtChoice = (v) => { setFmtChoiceRaw(v); saveJSON(K.format, v); };
-  const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "auto")));
-  const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "a4"));
+  const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "portrait")));
+  const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "exact"));
   const setPageMode = (v) => { setPageModeRaw(v); saveJSON(K.page, v); };
 
   const [social, setSocialRaw] = useState(() => loadJSON(K.social, activePreset().social || []));
