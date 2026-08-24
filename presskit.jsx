@@ -1039,11 +1039,14 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
 
         <div className="modal-section">Publicar el kit</div>
         <p className="modal-hint" style={{ marginBottom: 14 }}>
-          <b>Un archivo y listo.</b> Descargá el sitio como un solo <code>.html</code> con
-          todo adentro — textos, fotos, estilos — y arrastralo a{" "}
-          <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer">app.netlify.com/drop</a>.
-          Queda online al instante: sin GitHub, sin repositorio, sin build. Abre en modo
-          público, así que quien entre ve el press kit y nada de la edición.
+          <b>Un archivo y listo.</b> Descargá el sitio: un solo <code>index.html</code> con
+          todo adentro — textos, fotos, estilos. Tarda un poco, el botón te muestra en qué
+          paso va. Después arrastralo a{" "}
+          <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer">app.netlify.com/drop</a>{" "}
+          y queda online: sin GitHub, sin repositorio, sin build. Se llama
+          <code> index.html</code> porque es el nombre desde el que un hosting sirve la raíz
+          del sitio; con cualquier otro, la URL principal daría 404. Abre en modo público,
+          así que quien entre ve el press kit y nada de la edición.
         </p>
 
         <div className="modal-section">Llevarte los cambios</div>
@@ -1070,14 +1073,18 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
               setBusy("Preparando…");
               try {
                 const html = await buildStandalone(setBusy);
-                saveBlob(new Blob([html], { type: "text/html" }), "presskit.html");
+                // Named index.html on purpose: a host serves a site's root from
+                // that name, so the file works as a whole site the moment it is
+                // dropped. Called anything else, the root URL 404s and the kit
+                // is only reachable at /presskit.html.
+                saveBlob(new Blob([html], { type: "text/html" }), "index.html");
                 setBusy("");
               } catch (err) {
                 setBusy("");
                 alert("No pude armar el archivo: " + err.message);
               }
             }}>
-            {busy || "↓ Descargar sitio (1 archivo HTML)"}
+            {busy || "↓ Descargar sitio (index.html)"}
           </button>
           <button className="deploy-btn" onClick={exportContent}>
             ↓ Exportar {info.photos > 0 ? "kit (.zip)" : "content.json"}{" "}
