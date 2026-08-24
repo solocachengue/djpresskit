@@ -63,6 +63,16 @@ Los props que quedan vacíos simplemente desaparecen del spread — nunca sale u
 
 Todo se guarda en el `localStorage` del navegador mientras editás. Para que los cambios salgan de tu navegador, mirá la sección siguiente.
 
+## El sitio publicado es el press kit, no el editor
+
+Cuando existe un `content.json` en el repo, la app **abre en modo público**: sin barra superior, sin modales, sin nada de edición. Solo los spreads del cliente y un botón de PDF abajo a la derecha.
+
+- **Con `content.json`** → modo público. Es lo que ve quien entra al link.
+- **Con `content.json` y `?edit`** → vuelve el editor. Ej: `https://tu-sitio.netlify.app/?edit`. Es para el dueño del repo.
+- **Sin `content.json`** → editor. Es la plantilla recién clonada, que todavía hay que llenar.
+
+Las imágenes no quedan en el navegador: el export las escribe como archivos en `assets/` y el `content.json` guarda sus rutas, así que las sirve Netlify como cualquier otro asset.
+
 ## Llevarte los cambios (publicar tu contenido)
 
 Lo que editás vive en tu navegador. Eso alcanza para exportar un PDF, pero **no** para publicar: si deployás sin más, tu sitio muestra el contenido del template, y quien abra tu link no ve lo tuyo.

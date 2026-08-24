@@ -1258,6 +1258,25 @@ function App() {
 
   const preset = activePreset();
 
+  // Read-only published kit: the spreads and a PDF button, nothing else.
+  if (window.__VIEWER) {
+    return (
+      <>
+        <div className="book" ref={bookRef}>
+          {spreads.map((id, i) => (
+            <div className="spread-frame" key={`${id}-${i}`}>
+              <div className="spread-scaler">{renderSpread(id, i)}</div>
+            </div>
+          ))}
+        </div>
+        <button className="viewer-pdf" onClick={() => setShowPrint(true)}>↓ PDF</button>
+        <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format}
+          fmtChoice={fmtChoice} setFmtChoice={setFmtChoice}
+          pageMode={pageMode} setPageMode={setPageMode} />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="topbar">
@@ -1344,6 +1363,16 @@ async function boot() {
     // Sin archivo publicado todavía: se usan los defaults del preset.
   }
   window.__PUBLISHED = published || {};
+
+  // A deployed kit is a press kit, not an editor. Once content.json exists in
+  // the repo the site is somebody's finished kit, so it opens read-only: no top
+  // bar, no modals, no edit affordances — just the spreads and a way to take
+  // the PDF. ?edit brings the editor back for whoever owns the repo.
+  // Without content.json this is still the blank template, so it opens in the
+  // editor: otherwise a fresh clone would render a kit nobody could fill in.
+  const params = new URLSearchParams(location.search);
+  window.__VIEWER = !!published && !params.has("edit");
+  if (window.__VIEWER) document.documentElement.classList.add("is-viewer");
 
   // Nothing is painted until the display face is in. Every measurement in the
   // kit — the index rows, the justified bio, the wordmark — is set in that

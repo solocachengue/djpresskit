@@ -383,6 +383,24 @@
   .tb-btn.primary { background:var(--copper-500); border-color:var(--copper-500); color:var(--paper-000); }
   .tb-btn.primary:hover { background:var(--copper-400); border-color:var(--copper-400); color:var(--paper-000); }
 
+  /* ══════════════ VIEWER (published kit) ══════════════ */
+  .is-viewer .stage { padding:34px 20px 60px; }
+  .viewer-pdf {
+    position:fixed; right:20px; bottom:20px; z-index:900;
+    background:var(--copper-500); color:var(--paper-000); border:none;
+    padding:12px 20px; cursor:pointer;
+    font-family:var(--mono-font); font-size:11px; font-weight:700;
+    letter-spacing:var(--ls-label); text-transform:uppercase;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);
+    transition:background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .viewer-pdf:hover { background:var(--copper-400); transform:translateY(-2px); }
+  @media print { .viewer-pdf { display:none !important; } }
+  @media (max-width: 860px) {
+    .is-viewer .stage { padding:16px 10px 50px; }
+    .viewer-pdf { right:12px; bottom:12px; padding:10px 15px; font-size:10px; }
+  }
+
   /* ══════════════ MODALS ══════════════ */
   .modal {
     position:fixed; inset:0; z-index:2000; background:rgba(5,4,4,.93);
