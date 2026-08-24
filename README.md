@@ -1,3 +1,30 @@
+# DJ Press Kit — dos diseños, un editor
+
+Press kits de DJ editables en el navegador y exportables a PDF o a un sitio de un archivo. Hay **dos diseños completos**, no dos paletas: cada uno trae sus propios spreads, tipografía, texturas y un ejemplo cargado.
+
+| Diseño | Sistema | Spreads |
+|---|---|---|
+| **Eskay Da Real** | Foil cobre sobre negro, grano de película | Cover · Story · Social · Music · Skills · They Trust · Back |
+| **P.Luj** | Risograph a dos tintas: ladrillo sobre crema, semitono y rayaduras | Portada · Biografía · Artistas · Foto · Rider · Contacto |
+
+Se cambia en **● Estilo → Diseño**. Cambiar de diseño reemplaza el kit entero; lo editado en el otro queda guardado y vuelve al volver a él.
+
+## P.Luj — el sistema
+
+Dos tintas y nada más: ladrillo `#9F4C3F` y crema `#D8D0C6`, y el **fondo es la segunda tinta** — paneles enteros de una y de otra, alternando spread a spread.
+
+Lo que lo hace leer como impresión y no como página web:
+
+- **Duotono.** Ninguna foto existe a todo color. Se desatura y se le superpone la tinta en modo `color`, así conserva la luminancia de la foto y toma el tono del ladrillo. *(Con una cadena `sepia()+hue-rotate()` el resultado derivaba al oliva; medido, el tintado por fusión cae a 2° del ladrillo.)*
+- **Semitono.** Las fotos llevan una trama de puntos a 45°, visible a propósito. La retícula está construida sobre `(x+y)` y `(x−y)`, que son periódicas, así que el tile de 400px cierra exacto.
+- **Misregistro.** El display imprime dos veces: ladrillo abajo, crema arriba, desplazado. Ese "error" es la firma.
+- **Desgaste.** Rayaduras y polvo sobre cada fondo, y fibra de papel multiplicando sobre la crema. Las tres placas son tileables por construcción.
+- **Cortes, no redondeos.** Cada panel pierde una esquina, como recortado a mano.
+
+Reglas de contenido: las secciones se numeran `01 02 03` en una tipografía cuadrada tipo esténcil y **el número siempre es un objeto aparte** —una etiqueta, una caja— nunca va en línea con el título. Los títulos van en MAYÚSCULA. Las listas son chips con esquina cortada y una estrella.
+
+---
+
 # Eskay Da Real — Press Kit Template
 
 Press kit de DJ construido sobre el design system de **Eskay Da Real**: copper foil estampado sobre negro, atravesado por grano de película. Siete spreads apaisados (1280×655, el ratio de los artboards originales), todos editables en el navegador y exportables a PDF.

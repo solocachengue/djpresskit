@@ -29,6 +29,11 @@ const K = {
   grain:   "eskay.grain.v1",
   format:  "eskay.format.v1",
   page:    "eskay.pagemode.v1",
+  kit:     "eskay.kit.v1",
+  // Listas propias del kit P.Luj
+  artists:     "pluj.artists.v1",
+  rider:       "pluj.rider.v1",
+  hospitality: "pluj.hospitality.v1",
 };
 
 // CSS mm→px, para calcular la escala de impresión como número puro:
@@ -163,8 +168,14 @@ function downscaleImage(file) {
 }
 const saveImages = (i) => saveJSON(K.images, i);
 
-// The active preset supplies every default: copy, lists and the wordmark.
-const activePreset = () => PRESETS[loadJSON(K.preset, "eskay")] || PRESETS.eskay;
+// The active preset supplies every default: copy, lists and the wordmark — and
+// it comes from the active KIT, so a preset id belonging to another design
+// falls back to that kit's own first example instead of rendering nothing.
+const activePreset = () => {
+  const P = activeKit().presets();
+  const ids = Object.keys(P);
+  return P[loadJSON(K.preset, ids[0])] || P[ids[0]];
+};
 
 // Writes a whole preset into storage and reloads, so every mounted editable
 // picks up the new copy. Reload is the honest way here — the editables read
@@ -204,7 +215,11 @@ function collectContent() {
     [K.creds]:   loadJSON(K.creds, p.credentials),
     [K.venues]:  loadJSON(K.venues, p.venues),
     [K.social]:  loadJSON(K.social, p.social),
-    [K.spreads]: loadJSON(K.spreads, [...DEFAULT_SPREADS]),
+    [K.kit]:     loadJSON(K.kit, "eskay"),
+    [K.artists]:     loadJSON(K.artists, p.artists || []),
+    [K.rider]:       loadJSON(K.rider, p.rider || []),
+    [K.hospitality]: loadJSON(K.hospitality, p.hospitality || []),
+    [K.spreads]: loadJSON(K.spreads, [...activeKit().defaultSpreads()]),
     [K.opacity]: loadJSON(K.opacity, {}),
     [K.accent]:  loadJSON(K.accent, window.ACCENT_DEFAULT),
     [K.texture]: loadJSON(K.texture, window.TEXTURE_DEFAULT),
@@ -621,7 +636,8 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
 
   if (!src && optional && !editing) return null;
 
-  const label = hint || (window.IMAGE_SLOTS[id] && window.IMAGE_SLOTS[id].hint) || "subir imagen";
+  const slots = activeKit().imageSlots() || {};
+  const label = hint || (slots[id] && slots[id].hint) || "subir imagen";
   const isImgMode = mode === "img";
 
   const bg = (src && !isImgMode) ? {
@@ -1017,6 +1033,526 @@ function SpreadBack({ wordmark, editing, social, fmt }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// P.LUJ — ORNAMENTS
+// Drawn, not imported: the source's marks are rough geometry — an eight-point
+// star, a spiked burst, a checkerboard, a wireframe solid. They carry the
+// brand as much as the type does, so they are vector and recolour with the ink.
+// ═══════════════════════════════════════════════════════════════════════════
+function PjStar({ size = 90, color = "var(--pj-cream-lit)", style }) {
+  const pts = [];
+  for (let i = 0; i < 16; i++) {
+    const r = i % 2 === 0 ? 50 : 13;
+    const a = (Math.PI / 8) * i - Math.PI / 2;
+    pts.push(`${50 + r * Math.cos(a)},${50 + r * Math.sin(a)}`);
+  }
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} style={style} aria-hidden="true">
+      <polygon points={pts.join(" ")} fill={color} />
+    </svg>
+  );
+}
+
+function PjSpark({ size = 60, color = "var(--pj-cream-lit)", style }) {
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} style={style} aria-hidden="true">
+      <path d="M50 0 L58 42 L100 50 L58 58 L50 100 L42 58 L0 50 L42 42 Z" fill={color} />
+    </svg>
+  );
+}
+
+// The spiked disc that bleeds off the edge on the bio and rider spreads.
+function PjBurst({ size = 140, color = "var(--pj-brick-deep)", teeth = 13, style }) {
+  const pts = [];
+  for (let i = 0; i < teeth * 2; i++) {
+    const r = i % 2 === 0 ? 50 : 33;
+    const a = (Math.PI / teeth) * i;
+    pts.push(`${50 + r * Math.cos(a)},${50 + r * Math.sin(a)}`);
+  }
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} style={style} aria-hidden="true">
+      <polygon points={pts.join(" ")} fill={color} />
+    </svg>
+  );
+}
+
+function PjChecker({ w = 90, h = 34, cell = 11, color = "var(--pj-ink)", style }) {
+  const cells = [];
+  for (let y = 0; y * cell < h; y++) {
+    for (let x = 0; x * cell < w; x++) {
+      if ((x + y) % 2 === 0) cells.push(<rect key={`${x}-${y}`} x={x * cell} y={y * cell} width={cell} height={cell} fill={color} />);
+    }
+  }
+  return <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={style} aria-hidden="true">{cells}</svg>;
+}
+
+// A wireframe solid, drawn dashed like a blueprint.
+function PjWire({ size = 220, color = "var(--pj-ink-soft)", style }) {
+  const n = 9, R = 46, pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (2 * Math.PI / n) * i - Math.PI / 2;
+    pts.push([50 + R * Math.cos(a), 50 + R * Math.sin(a)]);
+  }
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if ((j - i) % 2 === 0 && j - i !== 2) continue;
+      lines.push(<line key={`${i}-${j}`} x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]}
+        stroke={color} strokeWidth=".5" strokeDasharray={(i + j) % 3 === 0 ? "3 2" : "none"} />);
+    }
+  }
+  return <svg viewBox="0 0 100 100" width={size} height={size} style={style} aria-hidden="true">{lines}</svg>;
+}
+
+function PjArrow({ w = 190, color = "var(--pj-cream-lit)", style }) {
+  return (
+    <svg viewBox="0 0 200 20" width={w} height={w * 0.1} style={style} aria-hidden="true">
+      <path d="M2 10 H198 M2 10 L14 3 M2 10 L14 17 M198 10 L186 3 M198 10 L186 17"
+        stroke={color} strokeWidth="2.4" fill="none" strokeLinecap="square" />
+    </svg>
+  );
+}
+
+// A photograph in this brand is never raw: it is reduced to the two inks and
+// then screened. This wraps both so no spread can forget one of them.
+function PjPhoto({ id, editing, deep, fine, objectPosition, style, className = "", children }) {
+  return (
+    <div className={`pj-photo ${deep ? "deep" : ""} ${className}`} style={style}>
+      <ImageSlot id={id} editing={editing} objectPosition={objectPosition}
+        style={{ position: "absolute", inset: 0, zIndex: 0 }} />
+      <span className="pj-tint" />
+      <span className="pj-lift" />
+      <span className={`pj-screen ${fine ? "fine" : ""}`} />
+      {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 01 — COVER
+// ═══════════════════════════════════════════════════════════════════════════
+function PjCover({ editing, fmt }) {
+  const L = window.PLUJ_LAYOUT.cover[fmt];
+  return (
+    <div className="spread" style={{ background: "var(--pj-black)" }}>
+      <PjPhoto id="pj-cover-bg" editing={editing} deep style={{ position: "absolute", inset: 0, zIndex: 0 }} />
+
+      <div className="layer" style={{ position: "absolute", top: L.top, left: L.pad, right: L.pad, zIndex: 5,
+                                      display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span className="pj-stencil" style={{ fontSize: L.tag, color: "var(--pj-cream-lit)" }}>
+          <Editable id="pj-cv-left" fallback="SP." />
+        </span>
+        <PjStar size={L.tag * 3} />
+        <span className="pj-stencil" style={{ fontSize: L.tag, color: "var(--pj-cream-lit)" }}>
+          <Editable id="pj-cv-right" fallback="ARG" />
+        </span>
+      </div>
+
+      {/* The cut-out sits on the ink, not in a frame: it is a sticker. */}
+      <ImageSlot id="pj-cover-cut" editing={editing} mode="img" fit="contain" optional
+        filter="var(--pj-duo-brick) drop-shadow(3px 0 0 var(--pj-cream-lit)) drop-shadow(-3px 0 0 var(--pj-cream-lit)) drop-shadow(0 3px 0 var(--pj-cream-lit)) drop-shadow(0 -3px 0 var(--pj-cream-lit))"
+        style={{ position: "absolute", left: L.cut.left, bottom: L.cut.bottom,
+                 width: L.cut.w, height: L.cut.h, zIndex: 4 }} />
+
+      <div className="layer" style={{ position: "absolute", left: L.markLeft, top: L.markTop, right: L.pad, zIndex: 6 }}>
+        <div className="pj-mark" style={{ fontSize: L.mark }}>
+          <Editable id="pj-cv-mark" fallback="P.LUJ" />
+        </div>
+        <div className="pj-title on-brick" style={{ fontSize: L.sub, letterSpacing: ".26em", marginTop: L.sub * .5 }}>
+          <Editable id="pj-cv-sub" fallback="PRESSKIT" />
+        </div>
+      </div>
+
+      <div className="layer" style={{ position: "absolute", left: 0, right: 0, bottom: L.top, zIndex: 6,
+                                      display: "flex", justifyContent: "center" }}>
+        <span className="pj-stencil" style={{ fontSize: L.tag, background: "var(--pj-brick-deep)",
+                                              color: "var(--pj-cream-lit)", padding: ".5em 1.1em" }}>
+          ▼ <Editable id="pj-cv-tag" fallback="(SCROLL DOWN)" /> ▼
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 02 — BIOGRAFÍA / SELLOS
+// Brick panel and cream panel meeting edge to edge, the cut-out straddling the
+// join so the two inks read as one sheet.
+// ═══════════════════════════════════════════════════════════════════════════
+function PjBio({ editing, fmt }) {
+  const L = window.PLUJ_LAYOUT.bio[fmt];
+  const stack = L.stack;
+  return (
+    <div className="spread" style={{ background: "var(--pj-brick)" }}>
+      <div className="pj-brick" style={stack ? { bottom: `calc(100% - ${L.split})` } : { right: `calc(100% - ${L.split})` }} />
+      <div className="pj-cream" style={stack ? { top: L.split } : { left: L.split }} />
+
+      {/* Ink panel: number tag, then the box of copy. */}
+      <div className="layer" style={{ position: "absolute", left: L.pad, top: L.pad, zIndex: 5,
+                                      width: stack ? `calc(100% - ${L.pad * 2}px)` : `calc(${L.split} - ${L.pad * 2}px)` }}>
+        <span className="pj-tag pj-notch">
+          <span className="pj-stencil" style={{ fontSize: L.tagNum, letterSpacing: ".05em" }}>
+            <Editable id="pj-bio-num" fallback="01" />
+          </span>
+          <span className="pj-stencil" style={{ fontSize: L.tagTitle }}>
+            <Editable id="pj-bio-title" fallback="BIOGRAFÍA" />
+          </span>
+        </span>
+
+        <div className="pj-box pj-notch pj-body" style={{ width: L.box.w, maxWidth: "100%",
+                                                          fontSize: L.box.fs, marginTop: L.pad * .55, textAlign: "justify" }}>
+          <p style={{ margin: 0 }}><Editable id="pj-bio-p1" multiline fallback="" /></p>
+          <p style={{ margin: `${L.box.fs}px 0 0` }}><Editable id="pj-bio-p2" multiline fallback="" /></p>
+        </div>
+        {!stack && <PjArrow w={L.box.w * .45} style={{ marginTop: L.pad * .6, opacity: .9 }} />}
+      </div>
+
+      {/* Cream panel: the labels the music came out on. */}
+      <div className="layer" style={{ position: "absolute", zIndex: 5,
+                                      ...(stack
+                                        ? { left: L.pad, right: L.pad, top: `calc(${L.split} + ${L.pad * .7}px)` }
+                                        : { left: `calc(${L.split} + ${L.pad * .8}px)`, right: L.pad, top: L.pad }) }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div className="pj-title on-cream" style={{ fontSize: L.panelTitle }}>
+              <Editable id="pj-bio-panel-title" fallback="SELLOS" />
+            </div>
+            <div className="pj-stencil" style={{ fontSize: L.panelSub, color: "var(--pj-ink)", marginTop: 2 }}>
+              <Editable id="pj-bio-panel-sub" fallback="Y LANZAMIENTOS" />
+            </div>
+          </div>
+          <PjChecker w={L.panelTitle * 1.9} h={L.panelTitle * .72} cell={L.panelTitle * .24} />
+        </div>
+
+        <div className="pj-body" style={{ fontSize: L.panelBody, color: "var(--pj-ink)",
+                                          textAlign: "center", marginTop: L.pad * .5 }}>
+          <Editable id="pj-bio-panel-body" multiline fallback="" />
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end",
+                      gap: L.logos * .28, marginTop: L.pad * .5 }}>
+          <PjBurst size={L.logos * 1.5} style={{ marginRight: "auto" }} />
+          {["pj-logo1", "pj-logo2", "pj-logo3"].map((id) => (
+            <ImageSlot key={id} id={id} editing={editing} mode="img" fit="contain" optional tone="paper"
+              style={{ width: L.logos, height: L.logos }} />
+          ))}
+        </div>
+      </div>
+
+      <ImageSlot id="pj-bio-cut" editing={editing} mode="img" fit="contain" optional
+        filter="var(--pj-duo-brick) drop-shadow(3px 0 0 var(--pj-cream-lit)) drop-shadow(-3px 0 0 var(--pj-cream-lit)) drop-shadow(0 -3px 0 var(--pj-cream-lit))"
+        style={{ position: "absolute", left: L.cut.left, bottom: L.cut.bottom,
+                 transform: "translateX(-50%)", width: L.cut.w, height: L.cut.h, zIndex: 6 }} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 03 — ARTISTAS
+// ═══════════════════════════════════════════════════════════════════════════
+function PjArtists({ editing, fmt }) {
+  const L = window.PLUJ_LAYOUT.artists[fmt];
+  const stack = fmt === "portrait";
+  return (
+    <div className="spread" style={{ background: "var(--pj-brick)" }}>
+      <div className="pj-brick" style={stack ? { bottom: "56%" } : { right: "50%" }} />
+      <div className="pj-cream" style={stack ? { top: "44%" } : { left: "50%" }} />
+
+      {/* The title is set as a column of syllables inside an inked box — the
+          number hangs below it in its own cream box. */}
+      <div className="layer" style={{ position: "absolute", left: L.pad, top: L.pad, zIndex: 5,
+                                      display: "flex", alignItems: "flex-start", gap: L.pad * .5 }}>
+        <div>
+          {/* The box is deliberately narrower than the word: the title breaks
+              into syllables down the column, which is how the source sets it. */}
+          <div style={{ background: "var(--pj-brick-deep)", border: "1px solid var(--pj-rule)",
+                        width: L.stackW, padding: `${L.pad * .4}px 0`, textAlign: "center" }}>
+            <div className="pj-stencil" style={{ fontSize: L.stackFs, color: "var(--pj-cream-lit)",
+                                                 lineHeight: 1.02, letterSpacing: ".06em", wordBreak: "break-all" }}>
+              <Editable id="pj-ar-stack" fallback="ARTISTAS" />
+            </div>
+            <PjStar size={L.star} style={{ marginTop: L.pad * .3 }} />
+          </div>
+          <div style={{ background: "var(--pj-cream-lit)", marginTop: 6, padding: `${L.pad * .18}px 0`, textAlign: "center" }}>
+            <span className="pj-stencil" style={{ fontSize: L.num, color: "var(--pj-ink)" }}>
+              <Editable id="pj-ar-num" fallback="02" />
+            </span>
+          </div>
+        </div>
+        <PjPhoto id="pj-artists-ph" editing={editing} fine className="pj-frame"
+          style={{ width: L.frame.w, height: L.frame.h }} />
+      </div>
+
+      <div className="layer" style={{ position: "absolute", zIndex: 5,
+                                      ...(stack
+                                        ? { left: L.pad, right: L.pad, top: `calc(44% + ${L.pad * .7}px)` }
+                                        : { left: `calc(50% + ${L.pad}px)`, right: L.pad, top: L.pad }) }}>
+        <div className="pj-title on-cream" style={{ fontSize: L.title, whiteSpace: "pre-line" }}>
+          <Editable id="pj-ar-title" multiline fallback="COMPARTIÓ CABINA:" />
+        </div>
+        <div style={{ marginTop: L.pad * .55 }}>
+          <PjChipList storageKey={K.artists} presetKey="artists" editing={editing} L={L} />
+        </div>
+        <div className="pj-chip solid pj-notch" style={{ marginTop: L.chipGap, padding: L.chipPad }}>
+          <span className="pj-body" style={{ fontSize: L.chipFs, fontWeight: 800 }}>
+            <Editable id="pj-ar-more" fallback="Entre otros (+++)" />
+          </span>
+        </div>
+      </div>
+
+      {!stack && <PjWire size={260} style={{ position: "absolute", right: -60, top: "22%", zIndex: 3, opacity: .8 }} />}
+    </div>
+  );
+}
+
+// Every list in this brand is a run of chips, each its own trimmed tag.
+function PjChipList({ storageKey, presetKey, editing, L }) {
+  const [items, setItems] = useState(() => loadJSON(storageKey, activePreset()[presetKey] || []));
+  const persist = (n) => { setItems(n); saveJSON(storageKey, n); };
+  const upd = (i, k, v) => persist(items.map((x, j) => j === i ? { ...x, [k]: v } : x));
+  return (
+    <>
+      <div className="pj-rows" style={{ gap: L.chipGap }}>
+        {items.map((it, i) => (
+          <div key={i} className="pj-chip pj-notch" style={{ padding: L.chipPad, position: "relative" }}>
+            <PjSpark size={L.chipFs * 1.15} color="var(--pj-ink)" />
+            <span className="pj-body" style={{ fontSize: L.chipFs }}>
+              <span contentEditable suppressContentEditableWarning spellCheck={false}
+                onBlur={(e) => upd(i, "label", e.currentTarget.innerText)}>{it.label}</span>
+              {(it.detail || editing) && (
+                <b> (<span contentEditable suppressContentEditableWarning spellCheck={false}
+                  onBlur={(e) => upd(i, "detail", e.currentTarget.innerText)}>{it.detail || "—"}</span>)</b>
+              )}
+            </span>
+            {editing && <button className="row-rm" onClick={() => persist(items.filter((_, j) => j !== i))}>✕</button>}
+          </div>
+        ))}
+      </div>
+      {editing && (
+        <button className="add-row on-paper" onClick={() => persist([...items, { label: "Nuevo artista", detail: "ARG" }])}>
+          + Agregar
+        </button>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 04 — FOTO A SANGRE
+// The breather. One image, the two inks, and the marks bleeding off the edges.
+// ═══════════════════════════════════════════════════════════════════════════
+function PjPhotoSpread({ editing, fmt }) {
+  const L = window.PLUJ_LAYOUT.photo[fmt];
+  return (
+    <div className="spread" style={{ background: "var(--pj-cream)" }}>
+      <div className="pj-cream" />
+      <PjPhoto id="pj-photo" editing={editing} style={{ position: "absolute", inset: L.inset, zIndex: 2 }} />
+      <PjStar size={L.star} style={{ position: "absolute", left: -L.star * .42, top: "52%", zIndex: 4 }} />
+      <PjSpark size={L.spark} style={{ position: "absolute", right: L.inset + L.spark * .2, top: "24%", zIndex: 4 }} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 05 — RIDER
+// Technical over the photograph, hospitality on the stock, joined by a notch
+// that reads as the tail of a speech bubble.
+// ═══════════════════════════════════════════════════════════════════════════
+function PjRider({ editing, fmt }) {
+  const L = window.PLUJ_LAYOUT.rider[fmt];
+  return (
+    <div className="spread" style={{ background: "var(--pj-cream)" }}>
+      <PjPhoto id="pj-rider-bg" editing={editing} deep
+        style={{ position: "absolute", left: 0, right: 0, top: 0, height: L.split, zIndex: 1 }} />
+      <div className="pj-cream" style={{ top: L.split }} />
+
+      <div className="layer" style={{ position: "absolute", left: L.pad, right: L.pad, top: L.pad * .7, zIndex: 5 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: L.pad * .35 }}>
+          <span className="pj-stencil" style={{ fontSize: L.num, color: "var(--pj-cream-lit)" }}>
+            <Editable id="pj-rd-num" fallback="03" />
+          </span>
+          <span className="pj-title on-brick" style={{ fontSize: L.title }}>
+            <Editable id="pj-rd-title" fallback="RIDER TÉCNICO" />
+          </span>
+        </div>
+        <div className="pj-box pj-notch-tl" style={{ marginTop: L.pad * .4 }}>
+          <PjBulletList storageKey={K.rider} presetKey="rider" editing={editing} fs={L.boxFs} />
+        </div>
+      </div>
+
+      {/* The tail that ties the inked panel to the stock below. */}
+      <div className="deco" style={{ position: "absolute", left: "62%", top: L.split, zIndex: 4,
+                                     width: 0, height: 0, borderLeft: "22px solid transparent",
+                                     borderRight: "22px solid transparent", borderTop: "26px solid var(--pj-brick-deep)" }} />
+      <PjBurst size={L.burst} style={{ position: "absolute", left: -L.burst * .42,
+                                       top: `calc(${L.split} + ${L.burst * .3}px)`, zIndex: 4 }} />
+
+      <div className="layer" style={{ position: "absolute", left: L.pad * 1.6, right: L.pad,
+                                      top: `calc(${L.split} + ${L.pad * .8}px)`, zIndex: 5 }}>
+        <div className="pj-title on-cream" style={{ fontSize: L.title2 }}>
+          <Editable id="pj-rd-title2" fallback="RIDER HOSPITALARIO" />
+        </div>
+        <div className="pj-rows" style={{ gap: L.rowFs * .75, marginTop: L.rowFs }}>
+          <PjLabelList storageKey={K.hospitality} presetKey="hospitality" editing={editing} fs={L.rowFs} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PjBulletList({ storageKey, presetKey, editing, fs }) {
+  const [items, setItems] = useState(() => loadJSON(storageKey, activePreset()[presetKey] || []));
+  const persist = (n) => { setItems(n); saveJSON(storageKey, n); };
+  const upd = (i, k, v) => persist(items.map((x, j) => j === i ? { ...x, [k]: v } : x));
+  return (
+    <>
+      {items.map((it, i) => (
+        <div key={i} className="pj-body" style={{ fontSize: fs, display: "flex", gap: ".6em",
+                                                  marginTop: i ? fs * .5 : 0, position: "relative" }}>
+          <span style={{ opacity: .9 }}>●</span>
+          <span>
+            <b><span contentEditable suppressContentEditableWarning spellCheck={false}
+              onBlur={(e) => upd(i, "label", e.currentTarget.innerText)}>{it.label}</span></b>
+            {(it.detail || editing) && (
+              <> (<span contentEditable suppressContentEditableWarning spellCheck={false}
+                onBlur={(e) => upd(i, "detail", e.currentTarget.innerText)}>{it.detail || "—"}</span>)</>
+            )}
+          </span>
+          {editing && <button className="row-rm" onClick={() => persist(items.filter((_, j) => j !== i))}>✕</button>}
+        </div>
+      ))}
+      {editing && (
+        <button className="add-row" onClick={() => persist([...items, { label: "Nuevo equipo", detail: "" }])}>
+          + Agregar
+        </button>
+      )}
+    </>
+  );
+}
+
+function PjLabelList({ storageKey, presetKey, editing, fs }) {
+  const [items, setItems] = useState(() => loadJSON(storageKey, activePreset()[presetKey] || []));
+  const persist = (n) => { setItems(n); saveJSON(storageKey, n); };
+  const upd = (i, k, v) => persist(items.map((x, j) => j === i ? { ...x, [k]: v } : x));
+  return (
+    <>
+      {items.map((it, i) => (
+        <div key={i} className="pj-body" style={{ fontSize: fs, color: "var(--pj-ink)", position: "relative" }}>
+          <b style={{ color: "var(--pj-ink)" }}>
+            <span contentEditable suppressContentEditableWarning spellCheck={false}
+              onBlur={(e) => upd(i, "label", e.currentTarget.innerText)}>{it.label}</span>:
+          </b>{" "}
+          <span contentEditable suppressContentEditableWarning spellCheck={false}
+            onBlur={(e) => upd(i, "detail", e.currentTarget.innerText)}>{it.detail}</span>
+          {editing && <button className="row-rm" onClick={() => persist(items.filter((_, j) => j !== i))}>✕</button>}
+        </div>
+      ))}
+      {editing && (
+        <button className="add-row on-paper" onClick={() => persist([...items, { label: "NUEVO", detail: "Detalle" }])}>
+          + Agregar
+        </button>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLUJ 06 — CONTACTO
+// ═══════════════════════════════════════════════════════════════════════════
+function PjContact({ editing, social, fmt }) {
+  const L = window.PLUJ_LAYOUT.contact[fmt];
+  return (
+    <div className="spread" style={{ background: "var(--pj-black)" }}>
+      <PjPhoto id="pj-contact-bg" editing={editing} deep style={{ position: "absolute", inset: 0, zIndex: 0 }} />
+      <span className="deco" style={{ position: "absolute", inset: 0, zIndex: 2,
+                                      background: "linear-gradient(90deg,rgba(27,20,19,.86) 0%,rgba(27,20,19,.55) 48%,rgba(27,20,19,.15) 100%)" }} />
+      <div className="layer" style={{ position: "absolute", left: L.pad, top: L.pad, right: L.pad, zIndex: 5 }}>
+        <div className="pj-title on-brick" style={{ fontSize: L.title }}>
+          <Editable id="pj-ct-title" fallback="CONTACTO" />
+        </div>
+        <div className="pj-rows" style={{ gap: L.gap, marginTop: L.gap * 1.4 }}>
+          {social.map((it, i) => (
+            <div className="pj-row" key={i} style={{ gap: L.icon * .8 }}>
+              <a href={it.href} target="_blank" rel="noopener noreferrer" style={{ gap: L.icon * .8 }}>
+                <Icon name={it.icon} size={L.icon} color="var(--pj-cream-lit)" />
+                <span className="pj-body" style={{ fontSize: L.rowFs, color: "var(--pj-cream-lit)", fontWeight: 700 }}>
+                  {it.label}
+                </span>
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KITS
+// A kit is a whole design: its own artboards, its own spread inventory, its
+// own compositions and its own example content. Not a palette swap — the two
+// that exist share no spread type beyond "there is a cover and a contact".
+// Content keys are namespaced per kit (eskay uses bare ids, pluj prefixes
+// pj-), so switching kits cannot drag one design's copy into the other.
+// ═══════════════════════════════════════════════════════════════════════════
+const KITS = {
+  eskay: {
+    id: "eskay", label: "Eskay Da Real",
+    desc: "Foil cobre estampado sobre negro, atravesado por grano de película",
+    fonts: null,                                  // ya viene en el <head>
+    applyTokens: () => {},                        // usa los tokens base
+    formats: () => window.FORMATS,
+    spreadTypes: () => window.SPREAD_TYPES,
+    defaultSpreads: () => window.DEFAULT_SPREADS,
+    presets: () => window.PRESETS,
+    imageSlots: () => window.IMAGE_SLOTS,
+    component: (id) => ({
+      cover: SpreadCover, story: SpreadStory, social: SpreadSocial,
+      music: SpreadMusic, skills: SpreadSkills, trust: SpreadTrust, back: SpreadBack,
+    })[id],
+  },
+  pluj: {
+    id: "pluj", label: "P.Luj",
+    desc: "Risograph a dos tintas: ladrillo sobre crema, semitono y rayaduras",
+    fonts: () => window.PLUJ_FONTS,
+    applyTokens: () => window.applyPlujTokens(),
+    formats: () => window.PLUJ_FORMATS,
+    spreadTypes: () => window.PLUJ_SPREAD_TYPES,
+    defaultSpreads: () => window.PLUJ_DEFAULT_SPREADS,
+    presets: () => window.PLUJ_PRESETS,
+    imageSlots: () => window.PLUJ_IMAGE_SLOTS,
+    component: (id) => ({
+      cover: PjCover, bio: PjBio, artists: PjArtists,
+      photo: PjPhotoSpread, rider: PjRider, contact: PjContact,
+    })[id],
+  },
+};
+
+const activeKit = () => KITS[loadJSON(K.kit, "eskay")] || KITS.eskay;
+
+// The kit's own formats, so "auto" still means "portrait on a narrow screen"
+// without every kit having to agree on one artboard.
+function resolveFmt(choice) {
+  const F = activeKit().formats();
+  if (choice === "landscape" || choice === "portrait") return F[choice];
+  return window.innerWidth < window.PORTRAIT_BREAKPOINT ? F.portrait : F.landscape;
+}
+
+function applyKit(id) {
+  const kit = KITS[id] || KITS.eskay;
+  kit.applyTokens();
+  const href = kit.fonts && kit.fonts();
+  if (href) {
+    let tag = document.getElementById("kit-fonts");
+    if (!tag) {
+      tag = document.createElement("link");
+      tag.id = "kit-fonts"; tag.rel = "stylesheet";
+      document.head.appendChild(tag);
+    }
+    if (tag.href !== href) tag.href = href;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MODALS
 // ═══════════════════════════════════════════════════════════════════════════
 function PresetModal({ open, onClose, currentId, social, setSocial }) {
@@ -1314,7 +1850,42 @@ function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, 
           <h2>pdf</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="modal-section" style={{ marginTop: 0 }}>Formato del press kit</div>
+        <div className="modal-section" style={{ marginTop: 0 }}>Diseño</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          Cada diseño es un sistema completo, no una paleta: trae sus propios spreads,
+          su tipografía, sus texturas y su ejemplo cargado. Cambiarlo reemplaza el kit entero.
+        </p>
+        <div className="preset-grid">
+          {Object.values(KITS).map((k) => (
+            <button key={k.id} className={`preset-card ${activeKit().id === k.id ? "active" : ""}`}
+              onClick={() => {
+                if (activeKit().id === k.id) return;
+                if (!confirm(`Cambiar al diseño "${k.label}"?\n\nEl kit se reemplaza entero: spreads, tipografía y ejemplo. Lo que editaste en el otro diseño queda guardado y vuelve si volvés a él.`)) return;
+                saveJSON(K.kit, k.id);
+                try { localStorage.removeItem(K.spreads); localStorage.removeItem(K.preset); } catch {}
+                location.reload();
+              }}>
+              <div className="preset-thumb" style={{ background: k.id === "pluj" ? "#9F4C3F" : "var(--ink-800)" }}>
+                <div className="preset-thumb-name"
+                  style={k.id === "pluj"
+                    ? { background: "none", WebkitTextFillColor: "#E6E0D6", color: "#E6E0D6",
+                        fontFamily: "'Archivo Black',sans-serif", textShadow: "3px 3px 0 #7A3529" }
+                    : null}>
+                  {k.id === "pluj" ? "P.LUJ" : "eskaydareal"}
+                </div>
+                <div className="preset-thumb-sub" style={k.id === "pluj" ? { color: "#E6E0D6" } : null}>
+                  {k.id === "pluj" ? "RISOGRAPH" : "COPPER FOIL"}
+                </div>
+              </div>
+              <div className="preset-info">
+                <div className="preset-name">{k.label}</div>
+                <div className="preset-desc">{k.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="modal-section">Formato del press kit</div>
         <div className="fmt-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
           {["landscape", "portrait"].map((id) => (
             <button key={id} className={`fmt-card ${format.id === id ? "active" : ""}`}
@@ -1400,8 +1971,8 @@ function SpreadBuilder({ open, onClose, spreads, setSpreads }) {
             <div className="builder-item" key={i}>
               <span className="builder-item-num">{String(i + 1).padStart(2, "0")}</span>
               <span>
-                <span className="builder-item-name">{SPREAD_TYPES[id]?.label || id}</span>
-                <div className="builder-item-desc">{SPREAD_TYPES[id]?.desc || ""}</div>
+                <span className="builder-item-name">{activeKit().spreadTypes()[id]?.label || id}</span>
+                <div className="builder-item-desc">{activeKit().spreadTypes()[id]?.desc || ""}</div>
               </span>
               <span className="builder-item-ctrl">
                 <button onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
@@ -1414,7 +1985,7 @@ function SpreadBuilder({ open, onClose, spreads, setSpreads }) {
 
         <div className="modal-section">Agregar spread</div>
         <div className="builder-add-grid">
-          {Object.entries(SPREAD_TYPES).map(([id, info]) => (
+          {Object.entries(activeKit().spreadTypes()).map(([id, info]) => (
             <button key={id} className="builder-add-card" onClick={() => setSpreads([...spreads, id])}>
               <div className="builder-add-name">{info.label}</div>
               <div className="builder-add-desc">{info.desc}</div>
@@ -1447,7 +2018,7 @@ function App() {
   // still serves the portrait board on narrow viewports.
   const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "portrait"));
   const setFmtChoice = (v) => { setFmtChoiceRaw(v); saveJSON(K.format, v); };
-  const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "portrait")));
+  const [format, setFormat] = useState(() => resolveFmt(loadJSON(K.format, "portrait")));
   const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "exact"));
   const setPageMode = (v) => { setPageModeRaw(v); saveJSON(K.page, v); };
 
@@ -1461,12 +2032,17 @@ function App() {
   const setTexture = (v) => { setTextureRaw(v); saveJSON(K.texture, v); };
   const setGrain = (v) => { setGrainRaw(v); saveJSON(K.grain, v); };
 
+  useLayoutEffect(() => { applyKit(loadJSON(K.kit, "eskay")); }, []);
   useLayoutEffect(() => { window.applyAccent(accent); }, [accent]);
   useLayoutEffect(() => { window.applyTexture(texture, grain); }, [texture, grain]);
 
   const [spreads, setSpreadsRaw] = useState(() => {
+    const def = activeKit().defaultSpreads();
     const saved = loadJSON(K.spreads, null);
-    return Array.isArray(saved) && saved.length ? saved : [...DEFAULT_SPREADS];
+    // A spread list from another kit names types this one does not have.
+    const ok = Array.isArray(saved) && saved.length &&
+      saved.every((id) => activeKit().spreadTypes()[id]);
+    return ok ? saved : [...def];
   });
   const setSpreads = (next) => { setSpreadsRaw(next); saveJSON(K.spreads, next); };
 
@@ -1477,7 +2053,7 @@ function App() {
     if (!el) return;
     const root = document.documentElement;
     const fit = () => {
-      const f = window.resolveFormat(fmtChoice);
+      const f = resolveFmt(fmtChoice);
       setFormat((prev) => (prev.id === f.id ? prev : f));
       root.style.setProperty("--sw", f.w + "px");
       root.style.setProperty("--sh", f.h + "px");
@@ -1516,17 +2092,10 @@ function App() {
   };
 
   const renderSpread = (id, i) => {
-    const props = { editing, wordmark, social, fmt: format.id, key: `${id}-${i}` };
-    switch (id) {
-      case "cover":  return <SpreadCover {...props} />;
-      case "story":  return <SpreadStory {...props} />;
-      case "social": return <SpreadSocial {...props} />;
-      case "music":  return <SpreadMusic {...props} />;
-      case "skills": return <SpreadSkills {...props} />;
-      case "trust":  return <SpreadTrust {...props} />;
-      case "back":   return <SpreadBack {...props} />;
-      default: return null;
-    }
+    const Comp = activeKit().component(id);
+    if (!Comp) return null;
+    return <Comp editing={editing} wordmark={wordmark} social={social}
+      fmt={format.id} key={`${id}-${i}`} />;
   };
 
   const preset = activePreset();
