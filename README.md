@@ -65,11 +65,13 @@ Todo se guarda en el `localStorage` del navegador mientras editás. Para que los
 
 ## Publicar el kit de un cliente: un archivo
 
-**↑ Publicar → Descargar sitio** genera un único `index.html` con todo adentro —textos, fotos, estilos y código— que abre en modo público. Se arrastra a [app.netlify.com/drop](https://app.netlify.com/drop) y queda online al instante.
+**↑ Publicar → Descargar el sitio** genera un `.zip` con un `index.html` que tiene todo adentro —textos, fotos, estilos y código— que abre en modo público. Se arrastra a [app.netlify.com/drop](https://app.netlify.com/drop) y queda online al instante.
 
 Sin GitHub, sin repositorio, sin build, sin cuenta. El archivo también se puede mandar por mail o abrir de un pendrive.
 
-Se llama `index.html` a propósito: es el nombre desde el que un hosting sirve la raíz del sitio. Con cualquier otro nombre, la URL principal daría 404 y el kit solo se vería en `/presskit.html`.
+Se llama `index.html` a propósito: es el nombre desde el que un hosting sirve la raíz del sitio. Con cualquier otro nombre, la URL principal daría 404.
+
+El zip incluye además un `LEEME.txt` con las instrucciones para publicarlo, para que quien reciba el kit no se quede con un archivo suelto y sin saber qué hacer. Va dentro del zip y no como segunda descarga porque los navegadores bloquean descargas múltiples.
 
 > **Por qué no el botón "Deploy to Netlify".** Ese botón clona *la plantilla* del repo: pide conectar una cuenta de GitHub, crea un repositorio nuevo y despliega el template **vacío**, porque lo que editó el cliente nunca salió de su navegador. Sirve para bifurcar el proyecto, no para publicar un kit.
 

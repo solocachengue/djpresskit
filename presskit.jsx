@@ -427,6 +427,56 @@ window.__FORCE_VIEWER = true;
 </html>`;
 }
 
+// Travels inside the zip so the person who receives the kit is not left with a
+// bare file and no idea what to do with it.
+function readmeText(title) {
+  return [
+    `PRESS KIT — ${title}`,
+    "",
+    "Este paquete tiene dos archivos:",
+    "",
+    "  index.html   El press kit entero: textos, fotos y diseño, todo adentro.",
+    "  LEEME.txt    Esto que estás leyendo.",
+    "",
+    "--------------------------------------------------------------",
+    "VERLO EN TU COMPUTADORA",
+    "--------------------------------------------------------------",
+    "",
+    "Doble click en index.html. Se abre en el navegador, sin instalar nada",
+    "y sin internet. El botón PDF de abajo a la derecha lo exporta.",
+    "",
+    "--------------------------------------------------------------",
+    "PUBLICARLO EN INTERNET (gratis, 2 minutos)",
+    "--------------------------------------------------------------",
+    "",
+    "1. Entrá a:  https://app.netlify.com/drop",
+    "",
+    "2. Arrastrá LA CARPETA que contiene index.html hasta esa página.",
+    "   (La carpeta entera, no solo el archivo.)",
+    "",
+    "3. Esperá unos segundos. Netlify te da una dirección tipo:",
+    "      https://algo-al-azar-123.netlify.app",
+    "",
+    "4. Esa dirección ya es tu press kit. Compartila.",
+    "",
+    "Para ponerle un nombre lindo: creá una cuenta gratis en Netlify,",
+    "entrá al sitio y en Site configuration > Change site name elegí el tuyo.",
+    "",
+    "--------------------------------------------------------------",
+    "ACTUALIZARLO MÁS ADELANTE",
+    "--------------------------------------------------------------",
+    "",
+    "Exportá el kit de nuevo y arrastrá el archivo nuevo al mismo sitio,",
+    "en la pestaña Deploys. Reemplaza al anterior y la dirección no cambia.",
+    "",
+    "--------------------------------------------------------------",
+    "",
+    "El archivo no necesita servidor, ni base de datos, ni build.",
+    "Podés mandarlo por mail o llevarlo en un pendrive.",
+    "",
+  ].join("\n");
+}
+
 function saveBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -1047,14 +1097,15 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
 
         <div className="modal-section">Publicar el kit</div>
         <p className="modal-hint" style={{ marginBottom: 14 }}>
-          <b>Un archivo y listo.</b> Descargá el sitio: un solo <code>index.html</code> con
-          todo adentro — textos, fotos, estilos. Tarda un poco, el botón te muestra en qué
-          paso va. Después arrastralo a{" "}
-          <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer">app.netlify.com/drop</a>{" "}
-          y queda online: sin GitHub, sin repositorio, sin build. Se llama
-          <code> index.html</code> porque es el nombre desde el que un hosting sirve la raíz
-          del sitio; con cualquier otro, la URL principal daría 404. Abre en modo público,
-          así que quien entre ve el press kit y nada de la edición.
+          <b>El kit entero en un archivo.</b> Se baja un <code>.zip</code> con
+          <code> index.html</code> —textos, fotos y diseño adentro— y un <code>LEEME.txt</code>
+          con las instrucciones para publicarlo. Tarda un poco: el botón te muestra en qué
+          paso va. Descomprimilo y arrastrá la carpeta a{" "}
+          <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer">app.netlify.com/drop</a>:
+          queda online sin GitHub, sin repositorio y sin build. Se llama <code>index.html</code>
+          porque es el nombre desde el que un hosting sirve la raíz del sitio; con cualquier
+          otro la URL principal daría 404. Abre en modo público, así que quien entre ve el
+          press kit y nada de la edición.
         </p>
 
         <div className="modal-section">Llevarte los cambios</div>
@@ -1081,18 +1132,25 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
               setBusy("Preparando…");
               try {
                 const html = await buildStandalone(setBusy);
-                // Named index.html on purpose: a host serves a site's root from
-                // that name, so the file works as a whole site the moment it is
-                // dropped. Called anything else, the root URL 404s and the kit
-                // is only reachable at /presskit.html.
-                saveBlob(new Blob([html], { type: "text/html" }), "index.html");
+                setBusy("Armando el paquete…");
+                // index.html, not any other name: a host serves a site's root
+                // from exactly that file, so the kit works the moment it lands.
+                // Zipped with the instructions because a browser will not fire
+                // two downloads at once, and a bare file with no note is a
+                // puzzle for whoever receives it.
+                const enc = new TextEncoder();
+                const title = (collectContent()[K.text] || {})["cv-wordmark"] || activePreset().wordmark;
+                saveBlob(zipFiles([
+                  { name: "index.html", data: enc.encode(html) },
+                  { name: "LEEME.txt", data: enc.encode(readmeText(title)) },
+                ]), "presskit-sitio.zip");
                 setBusy("");
               } catch (err) {
                 setBusy("");
                 alert("No pude armar el archivo: " + err.message);
               }
             }}>
-            {busy || "↓ Descargar sitio (index.html)"}
+            {busy || "↓ Descargar el sitio (.zip)"}
           </button>
           <button className="deploy-btn" onClick={exportContent}>
             ↓ Exportar {info.photos > 0 ? "kit (.zip)" : "content.json"}{" "}
