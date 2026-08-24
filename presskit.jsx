@@ -1838,22 +1838,21 @@ function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
 // landscape page box to fit it: the kit arrives sideways with white bands. The
 // setting is one click away, so the dialog is preceded by what to check rather
 // than letting it fail silently.
-function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, setPageMode }) {
+// Choosing a template is the first decision, not a setting buried in a styles
+// panel: it replaces the spreads, the type and the worked example at once.
+function TemplatesModal({ open, onClose }) {
   if (!open) return null;
-  const go = () => { onClose(); setTimeout(() => window.print(), 60); };
-  const landscape = format.id === "landscape";
-  const sheet = pageMode === "a4" ? "A4 vertical (210 × 297mm)" : format.page.replace(" ", " × ");
   return (
     <div className="modal" onClick={onClose}>
-      <div className="modal-inner" style={{ width: "min(620px,100%)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-inner" style={{ width: "min(760px,100%)" }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>pdf</h2>
+          <h2>templates</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="modal-section" style={{ marginTop: 0 }}>Diseño</div>
-        <p className="modal-hint" style={{ marginBottom: 14 }}>
-          Cada diseño es un sistema completo, no una paleta: trae sus propios spreads,
-          su tipografía, sus texturas y su ejemplo cargado. Cambiarlo reemplaza el kit entero.
+        <p className="modal-hint">
+          Cada template es un diseño completo, no una paleta: trae sus propios spreads,
+          tipografía, texturas y un ejemplo cargado. Elegí uno y editá encima. Lo que
+          hiciste en el otro queda guardado y vuelve si volvés a él.
         </p>
         <div className="preset-grid">
           {Object.values(KITS).map((k) => (
@@ -1884,8 +1883,24 @@ function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, 
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="modal-section">Formato del press kit</div>
+function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, setPageMode }) {
+  if (!open) return null;
+  const go = () => { onClose(); setTimeout(() => window.print(), 60); };
+  const landscape = format.id === "landscape";
+  const sheet = pageMode === "a4" ? "A4 vertical (210 × 297mm)" : format.page.replace(" ", " × ");
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="modal-inner" style={{ width: "min(620px,100%)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>pdf</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-section" style={{ marginTop: 0 }}>Formato del press kit</div>
         <div className="fmt-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
           {["landscape", "portrait"].map((id) => (
             <button key={id} className={`fmt-card ${format.id === id ? "active" : ""}`}
@@ -2008,6 +2023,7 @@ function App() {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const bookRef = useRef(null);
 
   // Hue and film stock are kit-wide, so they persist on their own keys and are
@@ -2126,6 +2142,7 @@ function App() {
         <button className={`tb-btn ${editing ? "active" : ""}`} onClick={() => setEditing(!editing)}>
           {editing ? "✓ Listo" : "✎ Editar"}
         </button>
+        <button className="tb-btn" onClick={() => setShowTemplates(true)}>◈ Templates</button>
         <button className="tb-btn" onClick={() => setShowPresets(true)}>◆ Contenido</button>
         <button className="tb-btn" onClick={() => setShowBuilder(true)}>☰ Spreads ({spreads.length})</button>
         <button className="tb-btn" onClick={() => setShowStyle(true)}>
@@ -2147,6 +2164,7 @@ function App() {
       <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice}
         pageMode={pageMode} setPageMode={setPageMode} />
+      <TemplatesModal open={showTemplates} onClose={() => setShowTemplates(false)} />
       <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice} format={format}
         accent={accent} setAccent={setAccent}
