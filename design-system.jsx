@@ -590,6 +590,11 @@ function applyTexture(id, intensity) {
 // visitor's own account rather than touching this deployment.
 const REPO_URL = "https://github.com/solocachengue/djpresskit";
 const DEPLOY = {
+  // Drop takes a finished file and puts it online. The repository routes below
+  // ask for a GitHub account and a new repo first, and then publish the empty
+  // template anyway, because the edits never left the browser — so they are for
+  // whoever wants to fork the template, not for publishing a kit.
+  drop: "https://app.netlify.com/drop",
   netlify: `https://app.netlify.com/start/deploy?repository=${REPO_URL}`,
   vercel: `https://vercel.com/new/clone?repository-url=${encodeURIComponent(REPO_URL)}`,
 };

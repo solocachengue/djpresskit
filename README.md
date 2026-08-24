@@ -63,6 +63,18 @@ Los props que quedan vacíos simplemente desaparecen del spread — nunca sale u
 
 Todo se guarda en el `localStorage` del navegador mientras editás. Para que los cambios salgan de tu navegador, mirá la sección siguiente.
 
+## Publicar el kit de un cliente: un archivo
+
+**↑ Publicar → Descargar sitio** genera un único `presskit.html` con todo adentro —textos, fotos, estilos y código— que abre en modo público. Se arrastra a [app.netlify.com/drop](https://app.netlify.com/drop) y queda online al instante.
+
+Sin GitHub, sin repositorio, sin build, sin cuenta. El archivo también se puede mandar por mail o abrir de un pendrive.
+
+> **Por qué no el botón "Deploy to Netlify".** Ese botón clona *la plantilla* del repo: pide conectar una cuenta de GitHub, crea un repositorio nuevo y despliega el template **vacío**, porque lo que editó el cliente nunca salió de su navegador. Sirve para bifurcar el proyecto, no para publicar un kit.
+
+Detalles del archivo: el JSX se transpila en el momento de exportar con el Babel que ya está en la página, así que el archivo final solo carga React —no un compilador de 3MB— y las fotos van como `data:` URIs. Un kit con las fotos del preset pesa unos 5MB.
+
+Las fotos que subís se re-encodean al subirlas (máx. 2000px, JPEG q84; PNG solo si tiene transparencia real). Sin eso, dos fotos de celular llenan el `localStorage`, que son unos pocos MB.
+
 ## El sitio publicado es el press kit, no el editor
 
 Cuando existe un `content.json` en el repo, la app **abre en modo público**: sin barra superior, sin modales, sin nada de edición. Solo los spreads del cliente y un botón de PDF abajo a la derecha.

@@ -565,6 +565,8 @@
   .deploy-btn:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-2px); }
   .deploy-btn svg { width:17px; height:17px; flex:0 0 auto; }
   button.deploy-btn { cursor:pointer; }
+  button.deploy-btn:disabled { opacity:.6; cursor:progress; }
+  .modal-hint a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
   .modal-hint code {
     font-family:var(--mono-font); font-size:10.5px; color:var(--accent);
     background:rgba(232,146,106,.1); padding:1px 5px;

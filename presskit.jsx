@@ -90,17 +90,77 @@ function printPageCss(f, mode) {
 // component can keep reading its initial value synchronously at mount.
 const loadJSON = (k, f) => {
   try {
-    const s = localStorage.getItem(k);
-    if (s != null) return JSON.parse(s);
+    // A standalone kit is a finished document: it must render its own content,
+    // not whatever the visitor happens to have edited on some other kit.
+    if (!window.__FORCE_VIEWER) {
+      const s = localStorage.getItem(k);
+      if (s != null) return JSON.parse(s);
+    }
   } catch {}
   const pub = window.__PUBLISHED;
   if (pub && pub[k] !== undefined) return pub[k];
   return f;
 };
-const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// Returns false when the write failed — localStorage is a few megabytes and a
+// couple of phone photos will fill it. Silently swallowing that made uploads
+// look like they had worked and then vanish on reload.
+const saveJSON = (k, v) => {
+  try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch { return false; }
+};
 const loadText  = () => loadJSON(K.text, {});
 const saveText  = (t) => saveJSON(K.text, t);
 const loadImages = () => loadJSON(K.images, {});
+
+// A phone photo is 3–5MB, and base64 inflates it by a third. Stored raw, two of
+// them overflow localStorage and land in an exported file nobody wants to
+// download. Uploads are re-encoded to a size a press kit page actually needs:
+// the widest thing any slot fills is a 1280px board, so 2000px covers print at
+// 2x. PNG is kept only when the image has real transparency — a cut-out prop or
+// a logo — because that is the only reason to pay for it.
+const MAX_PHOTO_PX = 2000;
+const MAX_PROP_PX = 1400;
+
+function hasAlpha(canvas, ctx) {
+  const { width: w, height: h } = canvas;
+  const step = Math.max(1, Math.floor(Math.min(w, h) / 64));
+  const d = ctx.getImageData(0, 0, w, h).data;
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      if (d[(y * w + x) * 4 + 3] < 250) return true;
+    }
+  }
+  return false;
+}
+
+function downscaleImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const isPng = /png|webp|gif/i.test(file.type);
+          const max = isPng ? MAX_PROP_PX : MAX_PHOTO_PX;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          const ctx = c.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          const keepPng = isPng && hasAlpha(c, ctx);
+          resolve(c.toDataURL(keepPng ? "image/png" : "image/jpeg", 0.84));
+        } catch {
+          resolve(reader.result);   // si el canvas falla, mejor la original que nada
+        }
+      };
+      img.onerror = () => resolve(reader.result);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 const saveImages = (i) => saveJSON(K.images, i);
 
 // The active preset supplies every default: copy, lists and the wordmark.
@@ -250,6 +310,115 @@ function buildExport() {
   return { data, files, json, photos: files.length, bytes: json.length + photoBytes };
 }
 
+// ── Standalone site export ──────────────────────────────────────────────────
+// The "deploy from git" route asks a DJ to connect a GitHub account and create
+// a repository, and then ships the empty template anyway because their edits
+// never left the browser. This produces the finished kit as ONE file instead:
+// content, photos, styles and code inlined, opening read-only. Drag it onto
+// app.netlify.com/drop and it is live — no repo, no build, no account.
+//
+// The JSX is transpiled here, with the Babel already on this page, so the
+// exported file loads React alone rather than a 3MB compiler.
+async function fetchText(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`no pude leer ${url} (${r.status})`);
+  return r.text();
+}
+
+async function toDataUrl(url) {
+  if (!url || url.startsWith("data:")) return url;
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`falta el archivo ${url}`);
+  const blob = await r.blob();
+  return await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(blob);
+  });
+}
+
+async function buildStandalone(onStep) {
+  const step = (m) => { if (onStep) onStep(m); };
+
+  step("Leyendo el proyecto…");
+  const [indexHtml, dsSrc, kitSrc] = await Promise.all([
+    fetchText("index.html"), fetchText("design-system.jsx"), fetchText("presskit.jsx"),
+  ]);
+
+  const doc = new DOMParser().parseFromString(indexHtml, "text/html");
+  let css = doc.querySelector("style") ? doc.querySelector("style").textContent : "";
+  const fontLink = Array.from(doc.querySelectorAll("link"))
+    .map((l) => l.outerHTML).filter((h) => /fonts\.googleapis/.test(h)).join("\n");
+
+  step("Empaquetando el contenido…");
+  const data = collectContent();
+
+  // Every asset the page can reach: the slots' own pictures and the textures
+  // named in the stylesheet.
+  const images = { ...(data[K.images] || {}) };
+  const cssUrls = Array.from(new Set(
+    (css.match(/url\(["']?(assets\/[^"')]+)["']?\)/g) || [])
+      .map((m) => m.replace(/url\(["']?/, "").replace(/["']?\)$/, ""))
+  ));
+  // Slots whose picture is still a repo path need that file inlined too.
+  const jsxUrls = Object.values(data[K.images] || {})
+    .filter((v) => typeof v === "string" && v.startsWith("assets/"));
+
+  step("Incrustando imágenes…");
+  for (const slot of Object.keys(images)) {
+    if (images[slot]) images[slot] = await toDataUrl(images[slot]);
+  }
+  data[K.images] = images;
+
+  const inlined = {};
+  for (const u of [...cssUrls, ...jsxUrls]) {
+    try { inlined[u] = await toDataUrl(u); } catch { /* asset ausente: se ignora */ }
+  }
+  for (const [u, d] of Object.entries(inlined)) {
+    css = css.split(u).join(d);
+  }
+  // The asset data URLs stay OUT of the JavaScript. Substituting them into the
+  // source first put multi-megabyte string literals in front of Babel and the
+  // transpile never returned. It is also unnecessary: collectContent already
+  // resolves every slot, including the preset's own props, so the runtime reads
+  // its pictures from the inlined content rather than from those paths.
+
+  step("Compilando…");
+  const opts = { presets: ["react"] };
+  const dsJs = window.Babel.transform(dsSrc, opts).code;
+  const kitJs = window.Babel.transform(kitSrc, opts).code;
+  const twkJs = window.Babel.transform(await fetchText("tweaks-panel.jsx"), opts).code;
+
+  const title = (data[K.text] && data[K.text]["cv-wordmark"]) || activePreset().wordmark;
+  step("Armando el archivo…");
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${title} — Press Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+${fontLink}
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin><\/script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin><\/script>
+<style>${css}</style>
+</head>
+<body>
+<div class="stage"><div id="root"></div></div>
+<script>
+window.__PUBLISHED_INLINE = ${JSON.stringify(data)};
+window.__FORCE_VIEWER = true;
+<\/script>
+<script>${twkJs}<\/script>
+<script>${dsJs}<\/script>
+<script>${kitJs}<\/script>
+</body>
+</html>`;
+}
+
 function saveBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -374,9 +543,14 @@ function ImageSlot({ id, className = "", style, hint, tone = "stage", editing,
 
   const onPick = (e) => {
     const file = e.target.files && e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setSrc(reader.result); const i = loadImages(); i[id] = reader.result; saveImages(i); };
-    reader.readAsDataURL(file);
+    downscaleImage(file).then((url) => {
+      setSrc(url);
+      const i = loadImages(); i[id] = url;
+      if (!saveImages(i)) {
+        alert("No entró en el almacenamiento del navegador. Probá con una foto más liviana, " +
+              "o exportá el kit para liberar espacio.");
+      }
+    });
   };
   const updateOpacity = (v) => { setOpacity(v); const o = loadJSON(K.opacity, {}); o[id] = v; saveJSON(K.opacity, o); };
   const clear = (e) => {
@@ -790,6 +964,7 @@ function SpreadBack({ wordmark, editing, social, fmt }) {
 function PresetModal({ open, onClose, currentId, social, setSocial }) {
   const fileRef = useRef(null);
   const [info, setInfo] = useState({ bytes: 0, photos: 0 });
+  const [busy, setBusy] = useState("");
   useEffect(() => {
     if (!open) return;
     const { bytes, photos } = buildExport();
@@ -862,6 +1037,15 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
           + Agregar link
         </button>
 
+        <div className="modal-section">Publicar el kit</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          <b>Un archivo y listo.</b> Descargá el sitio como un solo <code>.html</code> con
+          todo adentro — textos, fotos, estilos — y arrastralo a{" "}
+          <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer">app.netlify.com/drop</a>.
+          Queda online al instante: sin GitHub, sin repositorio, sin build. Abre en modo
+          público, así que quien entre ve el press kit y nada de la edición.
+        </p>
+
         <div className="modal-section">Llevarte los cambios</div>
         <p className="modal-hint" style={{ marginBottom: 16 }}>
           Lo que editás se guarda en <b>este navegador</b>. Para que tu press kit viaje
@@ -881,6 +1065,20 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
               Cuando subas alguna, el export pasa a ser un <code>.zip</code> con las fotos en <code>assets/</code>.</>}
         </p>
         <div className="deploy-row">
+          <button className="deploy-btn" disabled={busy}
+            onClick={async () => {
+              setBusy("Preparando…");
+              try {
+                const html = await buildStandalone(setBusy);
+                saveBlob(new Blob([html], { type: "text/html" }), "presskit.html");
+                setBusy("");
+              } catch (err) {
+                setBusy("");
+                alert("No pude armar el archivo: " + err.message);
+              }
+            }}>
+            {busy || "↓ Descargar sitio (1 archivo HTML)"}
+          </button>
           <button className="deploy-btn" onClick={exportContent}>
             ↓ Exportar {info.photos > 0 ? "kit (.zip)" : "content.json"}{" "}
             <span style={{ color: "var(--text-muted)" }}>({prettySize(info.bytes)})</span>
@@ -1008,11 +1206,13 @@ function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
 
         <div className="modal-section">Publicar tu copia</div>
         <p className="modal-hint" style={{ marginBottom: 14 }}>
-          Estos botones clonan el repo en tu cuenta y lo dejan online. No tocan este sitio.
+          Para publicar un kit usá <b>Descargar sitio</b> arriba y soltá ese archivo en Drop.
+          Los de abajo clonan la <i>plantilla</i> vacía en tu cuenta — sirven para bifurcar el
+          proyecto, no para publicar el kit de un cliente.
         </p>
         <div className="deploy-row">
-          <a className="deploy-btn" href={window.DEPLOY.netlify} target="_blank" rel="noopener noreferrer">
-            <NetlifyMark /> Deploy en Netlify
+          <a className="deploy-btn" href={window.DEPLOY.drop} target="_blank" rel="noopener noreferrer">
+            <NetlifyMark /> Abrir Netlify Drop
           </a>
           <a className="deploy-btn" href={window.DEPLOY.vercel} target="_blank" rel="noopener noreferrer">
             <VercelMark /> Deploy en Vercel
@@ -1290,8 +1490,7 @@ function App() {
           <span style={{ color: "var(--accent)" }}>●</span> Estilo
         </button>
         <span className="topbar-spacer" />
-        <a className="tb-btn" href={window.DEPLOY.netlify} target="_blank" rel="noopener noreferrer"
-           style={{ textDecoration: "none" }}>◆ Netlify</a>
+        <button className="tb-btn" onClick={() => setShowPresets(true)}>↑ Publicar</button>
         <button className="tb-btn primary" onClick={() => setShowPrint(true)}>↓ PDF</button>
       </div>
 
@@ -1351,16 +1550,20 @@ function App() {
 // showing the template until a reload. A missing file is the normal case for a
 // fresh clone — it just means "no published content yet".
 async function boot() {
-  let published = null;
-  try {
-    const res = await fetch("content.json", { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.__format === CONTENT_FORMAT) published = data;
-      else console.warn("[presskit] content.json ignorado: formato desconocido");
+  // The standalone export carries its content inside the file, so there is
+  // nothing to fetch and nothing to configure.
+  let published = window.__PUBLISHED_INLINE || null;
+  if (!published) {
+    try {
+      const res = await fetch("content.json", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.__format === CONTENT_FORMAT) published = data;
+        else console.warn("[presskit] content.json ignorado: formato desconocido");
+      }
+    } catch (e) {
+      // Sin archivo publicado todavía: se usan los defaults del preset.
     }
-  } catch (e) {
-    // Sin archivo publicado todavía: se usan los defaults del preset.
   }
   window.__PUBLISHED = published || {};
 
@@ -1371,7 +1574,7 @@ async function boot() {
   // Without content.json this is still the blank template, so it opens in the
   // editor: otherwise a fresh clone would render a kit nobody could fill in.
   const params = new URLSearchParams(location.search);
-  window.__VIEWER = !!published && !params.has("edit");
+  window.__VIEWER = window.__FORCE_VIEWER === true || (!!published && !params.has("edit"));
   if (window.__VIEWER) document.documentElement.classList.add("is-viewer");
 
   // Nothing is painted until the display face is in. Every measurement in the
