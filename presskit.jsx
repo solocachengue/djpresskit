@@ -42,24 +42,43 @@ const MM_PX = 96 / 25.4;
 //  · "a4"     — A4 con la orientación del tablero. Deja bandas, pero es un papel
 //               que todo diálogo tiene, así que nunca termina rotado.
 function printPageCss(f, mode) {
+  // The sheet is whatever the print dialog ends up using: `size` is a request,
+  // not a guarantee. When the two disagree the frame overflows the sheet and
+  // the spread is sliced across two pages — the failure this has to avoid.
+  //
+  //  · "a4"    — asks for A4 PORTRAIT and fits the spread across its width. A
+  //              landscape board becomes a centred band. Portrait is what a
+  //              dialog is already holding, and even if it lands on landscape
+  //              A4 or Letter the box still fits, so it can never be cut.
+  //  · "exact" — a sheet cut to the board. Edge to edge, no bands, but it needs
+  //              the dialog to accept a custom paper size.
   let pw, ph, size;
   if (mode === "a4") {
-    const wide = f.w >= f.h;
-    pw = wide ? 297 : 210;
-    ph = wide ? 210 : 297;
-    size = wide ? "A4 landscape" : "A4 portrait";
+    pw = 210; ph = 297; size = "A4 portrait";
   } else {
     const parts = f.page.split(" ");
     pw = parseFloat(parts[0]); ph = parseFloat(parts[1]);
     size = f.page;
   }
   const k = Math.min(pw * MM_PX / f.w, ph * MM_PX / f.h);
+  // Centred with flex rather than computed offsets. The unscaled board is
+  // centred in the frame and then scaled about its own centre, so it stays
+  // centred without the page's pixel size entering the arithmetic — which
+  // matters because the print layout viewport is not always the page box.
+  // (translate(-50%,-50%) is not an option: its percentages resolve against
+  // the element's UNSCALED box and overshoot whenever the scale is not 1.)
   return `@media print{@page{size:${size};margin:0}` +
-    `.spread-frame{width:${pw}mm !important;height:${ph}mm !important;overflow:hidden !important}` +
-    `.spread-frame > .spread-scaler{left:50% !important;top:50% !important;` +
-    `transform:translate(-50%,-50%) scale(${k.toFixed(5)}) !important;` +
-    `transform-origin:center center !important}}`;
+    `.spread-frame{width:${pw}mm !important;height:${ph}mm !important;` +
+    `overflow:hidden !important;position:relative !important;margin:0 !important;` +
+    `display:flex !important;align-items:center !important;justify-content:center !important}` +
+    `.spread-frame > .spread-scaler{position:static !important;flex:0 0 auto !important;` +
+    `transform:scale(${k.toFixed(5)}) !important;transform-origin:center center !important}}`;
 }
+
+
+
+
+
 
 // Three layers, in precedence order:
 //   1. localStorage — edits made in THIS browser, not published yet.
@@ -1014,9 +1033,7 @@ function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, 
   if (!open) return null;
   const go = () => { onClose(); setTimeout(() => window.print(), 60); };
   const landscape = format.id === "landscape";
-  const sheet = pageMode === "a4"
-    ? (landscape ? "A4 horizontal (297 × 210mm)" : "A4 vertical (210 × 297mm)")
-    : format.page.replace(" ", " × ");
+  const sheet = pageMode === "a4" ? "A4 vertical (210 × 297mm)" : format.page.replace(" ", " × ");
   return (
     <div className="modal" onClick={onClose}>
       <div className="modal-inner" style={{ width: "min(620px,100%)" }} onClick={(e) => e.stopPropagation()}>
@@ -1045,16 +1062,17 @@ function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, 
           </button>
           <button className={`fmt-card ${pageMode === "a4" ? "active" : ""}`}
             onClick={() => setPageMode("a4")}>
-            <span className="fmt-name">A4</span>
-            <span className="fmt-desc">Deja bandas, pero es un papel que todo diálogo tiene: nunca sale rotado.</span>
+            <span className="fmt-name">A4 · siempre entra</span>
+            <span className="fmt-desc">Hoja A4 vertical con el spread ajustado al ancho. Deja bandas, pero no se corta ni se rota con ninguna configuración del diálogo.</span>
           </button>
         </div>
         <p className="modal-hint" style={{ marginTop: 12 }}>
           {pageMode === "a4"
-            ? <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>. Este modo existe justamente
-              para cuando el diálogo gira el kit: al usar un papel estándar, la orientación ya coincide.</>
-            : <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>. Si el PDF te sale de
-              costado, el diálogo está imponiendo otro papel — cambiá a <b>A4</b> acá arriba y se arregla.</>}
+            ? <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>, con el spread centrado y
+              ajustado al ancho. Es el modo a prueba de diálogo: entre en la hoja que entre, no se corta.</>
+            : <>Vas a imprimir en <b style={{ color: "var(--accent)" }}>{sheet}</b>, borde a borde y sin bandas.
+              Necesita que el diálogo acepte <b>papel personalizado</b>; si te sale cortado o de costado,
+              volvé a <b>A4</b>.</>}
         </p>
 
         <div className="modal-section">En el diálogo</div>
@@ -1064,7 +1082,9 @@ function PrintModal({ open, onClose, format, fmtChoice, setFmtChoice, pageMode, 
             <b>Tamaño de papel</b> → <code>{pageMode === "a4" ? "A4" : "Personalizado"}</code>
             {pageMode === "exact" && <span>Si no te deja elegirlo, usá el modo A4 de arriba.</span>}
           </li>
-          <li><b>Orientación</b> → <code>{landscape ? "Horizontal" : "Vertical"}</code>.</li>
+          <li>
+            <b>Orientación</b> → <code>{pageMode === "a4" ? "Vertical" : (landscape ? "Horizontal" : "Vertical")}</code>.
+          </li>
           <li>
             <b>Gráficos de fondo</b> → activado, en <i>Más configuraciones</i>.
             <span>Sin esto se pierden las fotos, el grano y el foil.</span>
@@ -1152,7 +1172,7 @@ function App() {
   const [fmtChoice, setFmtChoiceRaw] = useState(() => loadJSON(K.format, "auto"));
   const setFmtChoice = (v) => { setFmtChoiceRaw(v); saveJSON(K.format, v); };
   const [format, setFormat] = useState(() => window.resolveFormat(loadJSON(K.format, "auto")));
-  const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "exact"));
+  const [pageMode, setPageModeRaw] = useState(() => loadJSON(K.page, "a4"));
   const setPageMode = (v) => { setPageModeRaw(v); saveJSON(K.page, v); };
 
   const [social, setSocialRaw] = useState(() => loadJSON(K.social, activePreset().social || []));
