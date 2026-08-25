@@ -226,7 +226,7 @@ const PLUJ_PRESETS = {
       { icon: "spotify",    label: "P.Luj",                href: "https://open.spotify.com/" },
       { icon: "beatport",   label: "P.Luj",                href: "https://www.beatport.com/" },
     ],
-  },,
+  },
 
   // Contenido real de KESSLER, tomado de djkessler.com. Los números y las
   // plazas son suyos; el rider va marcado "a confirmar" porque no está
@@ -278,7 +278,7 @@ const PLUJ_PRESETS = {
       { label: "Fiestas Like", detail: "CL" },
     ],
     rider: [
-      { label: "2x CDJ + mixer de club", detail: "a confirmar con el artista" },
+      { label: "2x CDJ 3000 + MIXER DJM-A9", detail: "" },
       { label: "Monitores estéreo (L/R) + Sub", detail: "" },
     ],
     hospitality: [
