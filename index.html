@@ -398,8 +398,8 @@
     content:""; position:absolute; inset:0; pointer-events:none;
     background-image:var(--pj-scratch); background-size:400px 400px;
   }
-  .pj-brick::after { opacity:.30; mix-blend-mode:soft-light; }
-  .pj-cream::after { opacity:.22; mix-blend-mode:multiply; }
+  .pj-brick::after { opacity:.45; mix-blend-mode:soft-light; }
+  .pj-cream::after { opacity:.34; mix-blend-mode:multiply; }
   .pj-cream::before {
     content:""; position:absolute; inset:0; pointer-events:none;
     background-image:var(--pj-paper); background-size:400px 400px;
@@ -420,12 +420,15 @@
   .pj-tint { z-index:2; background:var(--pj-brick); mix-blend-mode:color; }
   .pj-lift { z-index:2; background:var(--pj-cream); mix-blend-mode:soft-light; opacity:.28; }
   .pj-photo.deep .pj-lift { opacity:.16; }
+  /* Grano de fotocopia, no retícula de puntos: la trama regular se lee como
+     efecto de filtro; lo que hace la impresión barata es ruido irregular. El
+     tile va chico para que las motas queden de 1-2px en pantalla. */
   .pj-screen {
     position:absolute; inset:0; pointer-events:none; z-index:3;
-    background-image:var(--pj-halftone); background-size:400px 400px;
-    mix-blend-mode:multiply; opacity:.55;
+    background-image:var(--pj-halftone); background-size:200px 200px;
+    mix-blend-mode:multiply; opacity:.68;
   }
-  .pj-screen.fine { background-size:260px 260px; opacity:.42; }
+  .pj-screen.fine { background-size:150px 150px; opacity:.55; }
 
   /* Type. The display face prints twice: brick under cream, offset. That
      misregistration is the signature of the whole system. */
