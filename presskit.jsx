@@ -180,10 +180,13 @@ const activePreset = () => {
 // Writes a whole preset into storage and reloads, so every mounted editable
 // picks up the new copy. Reload is the honest way here — the editables read
 // their initial value once at mount by design.
-function applyPreset(id) {
-  const p = PRESETS[id];
+function applyPreset(id, kitId) {
+  const kid = kitId || loadJSON(K.kit, "eskay");
+  const p = (KITS[kid] || KITS.eskay).presets()[id];
   if (!p) return;
+  saveJSON(K.kit, kid);
   saveJSON(K.preset, id);
+  try { localStorage.removeItem(K.spreads); } catch {}
   saveJSON(K.text, { ...p.text });
   saveJSON(K.genres, p.genres);
   saveJSON(K.creds, p.credentials);
@@ -1579,32 +1582,43 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
     <div className="modal" onClick={onClose}>
       <div className="modal-inner" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>contenido</h2>
+          <h2>kits</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <p className="modal-hint">
-          Estos son los ejemplos del template <b>{activeKit().label}</b> — cada template
-          trae los suyos. Lo que cambiás acá es el <b>contenido</b>: textos, listas y fotos.
-          El diseño se cambia en <b>◈ Templates</b>.
+          Elegí un kit y editá encima. Cada uno trae su diseño completo —spreads,
+          tipografía, texturas— y su contenido de ejemplo cargado.
         </p>
         <div className="preset-grid">
-          {Object.values(PRESETS).map((p) => (
-            <button key={p.id} className={`preset-card ${currentId === p.id ? "active" : ""}`}
-              onClick={() => {
-                if (currentId === p.id) return onClose();
-                if (!confirm(`Cargar el contenido de "${p.name}"?\n\nReemplaza los textos y listas actuales. Las fotos que hayas subido se mantienen.`)) return;
-                applyPreset(p.id);
-              }}>
-              <div className="preset-thumb" style={{ background: "var(--ink-800)" }}>
-                <div className="preset-thumb-name">{p.wordmark}</div>
-                <div className="preset-thumb-sub">{p.text["cv-foot-right"]}</div>
-              </div>
-              <div className="preset-info">
-                <div className="preset-name">{p.name}</div>
-                <div className="preset-desc">{p.desc}</div>
-              </div>
-            </button>
-          ))}
+          {Object.values(KITS).flatMap((kit) =>
+            Object.values(kit.presets()).map((p) => {
+              const on = activeKit().id === kit.id && currentId === p.id;
+              const pluj = kit.id === "pluj";
+              return (
+                <button key={`${kit.id}-${p.id}`} className={`preset-card ${on ? "active" : ""}`}
+                  onClick={() => {
+                    if (on) return onClose();
+                    if (!confirm(`Cargar "${p.name}"?\n\nReemplaza el kit entero: diseño, textos, listas y fotos.`)) return;
+                    applyPreset(p.id, kit.id);
+                  }}>
+                  <div className="preset-thumb" style={{ background: pluj ? "#9F4C3F" : "var(--ink-800)" }}>
+                    <div className="preset-thumb-name"
+                      style={pluj ? { background: "none", WebkitTextFillColor: "#E6E0D6", color: "#E6E0D6",
+                                      fontFamily: "'Archivo Black',sans-serif", textShadow: "3px 3px 0 #7A3529" } : null}>
+                      {p.wordmark}
+                    </div>
+                    <div className="preset-thumb-sub" style={pluj ? { color: "#E6E0D6" } : null}>
+                      {pluj ? "RISOGRAPH" : "COPPER FOIL"}
+                    </div>
+                  </div>
+                  <div className="preset-info">
+                    <div className="preset-name">{p.name}</div>
+                    <div className="preset-desc">{p.desc}</div>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
 
         <div className="modal-section">Links y redes</div>
@@ -2164,8 +2178,7 @@ function App() {
         <button className={`tb-btn ${editing ? "active" : ""}`} onClick={() => setEditing(!editing)}>
           {editing ? "✓ Listo" : "✎ Editar"}
         </button>
-        <button className="tb-btn" onClick={() => setShowTemplates(true)}>◈ Templates</button>
-        <button className="tb-btn" onClick={() => setShowPresets(true)}>◆ Contenido</button>
+        <button className="tb-btn" onClick={() => setShowPresets(true)}>◆ Kits</button>
         <button className="tb-btn" onClick={() => setShowBuilder(true)}>☰ Spreads ({spreads.length})</button>
         <button className="tb-btn" onClick={() => setShowStyle(true)}>
           <span style={{ color: "var(--accent)" }}>●</span> Estilo
@@ -2186,7 +2199,6 @@ function App() {
       <PrintModal open={showPrint} onClose={() => setShowPrint(false)} format={format}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice}
         pageMode={pageMode} setPageMode={setPageMode} />
-      <TemplatesModal open={showTemplates} onClose={() => setShowTemplates(false)} />
       <StyleModal open={showStyle} onClose={() => setShowStyle(false)}
         fmtChoice={fmtChoice} setFmtChoice={setFmtChoice} format={format}
         accent={accent} setAccent={setAccent}
