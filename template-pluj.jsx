@@ -226,7 +226,76 @@ const PLUJ_PRESETS = {
       { icon: "spotify",    label: "P.Luj",                href: "https://open.spotify.com/" },
       { icon: "beatport",   label: "P.Luj",                href: "https://www.beatport.com/" },
     ],
-  },
+  },,
+
+  // Contenido real de KESSLER, tomado de djkessler.com. Los números y las
+  // plazas son suyos; el rider va marcado "a confirmar" porque no está
+  // publicado y no corresponde inventarlo.
+  kessler: {
+    id: "kessler",
+    name: "KESSLER",
+    desc: "Reggaetón y cachengue, Buenos Aires — fundador de Solo Cachengue",
+    wordmark: "KESSLER",
+    images: {
+      "pj-cover-bg":   "assets/kess-cover.jpg",
+      "pj-photo":      "assets/kess-photo.jpg",
+      "pj-artists-ph": "assets/kess-artists.jpg",
+      "pj-rider-bg":   "assets/kess-rider.jpg",
+      "pj-contact-bg": "assets/kess-contact.jpg",
+    },
+    text: {
+      "pj-cv-left": "BA.",
+      "pj-cv-right": "ARG",
+      "pj-cv-mark": "KESSLER",
+      "pj-cv-sub": "PRESSKIT",
+      "pj-cv-tag": "(SCROLL DOWN)",
+
+      "pj-bio-num": "01",
+      "pj-bio-title": "BIOGRAFÍA",
+      "pj-bio-p1": "KESSLER es DJ y productor de Buenos Aires. Empezó a tocar en 2011 y desde 2017 se afianzó en clubes y festivales de Argentina, Uruguay, Bolivia y Chile, con un sonido que cruza el reggaetón con el cachengue.",
+      "pj-bio-p2": "Productor desde 2018, fundó Solo Cachengue, la comunidad de DJs más grande de Argentina y Uruguay, con más de 1.000 miembros. Hoy además dirige la identidad sonora de varios clubes.",
+      "pj-bio-panel-title": "NÚMEROS",
+      "pj-bio-panel-sub": "Y COMUNIDAD",
+      "pj-bio-panel-body": "1.000.000 de oyentes mensuales en Spotify alcanzados en 2021. Más de 25 millones de reproducciones acumuladas y presencia en el Top 50 de más de 40 países. Solo Cachengue reúne a más de 1.000 DJs de Argentina y Uruguay.",
+
+      "pj-ar-num": "02",
+      "pj-ar-stack": "PLAZAS",
+      "pj-ar-title": "TOCÓ EN:",
+      "pj-ar-more": "Y muchos más (+++)",
+
+      "pj-rd-num": "03",
+      "pj-rd-title": "RIDER TÉCNICO",
+      "pj-rd-title2": "RIDER HOSPITALARIO",
+
+      "pj-ct-title": "CONTACTO",
+    },
+    artists: [
+      { label: "JET BA", detail: "ARG" },
+      { label: "Tokyo", detail: "ARG" },
+      { label: "Costa 7070", detail: "ARG" },
+      { label: "Big Charco", detail: "UY" },
+      { label: "Wynwood", detail: "Santa Cruz, BO" },
+      { label: "Fiestas Like", detail: "CL" },
+    ],
+    rider: [
+      { label: "2x CDJ + mixer de club", detail: "a confirmar con el artista" },
+      { label: "Monitores estéreo (L/R) + Sub", detail: "" },
+    ],
+    hospitality: [
+      { label: "ALOJAMIENTO", detail: "A confirmar según plaza." },
+      { label: "TRASLADO", detail: "A confirmar según plaza." },
+      { label: "VIÁTICOS", detail: "A confirmar." },
+      { label: "INVITACIONES", detail: "Lista de invitaciones al evento." },
+    ],
+    social: [
+      { icon: "mail",      label: "djkessleroficial@gmail.com", href: "mailto:djkessleroficial@gmail.com" },
+      { icon: "whatsapp",  label: "+54 9 2229 511398",          href: "https://wa.me/5492229511398" },
+      { icon: "instagram", label: "@djkessler_",                href: "https://instagram.com/djkessler_" },
+      { icon: "spotify",   label: "KESSLER",                    href: "https://open.spotify.com/artist/0yC2pt2fUIn0qqGNJDFIyc" },
+      { icon: "tiktok",    label: "@djkessler",                 href: "https://tiktok.com/@djkessler" },
+      { icon: "youtube",   label: "@DjKessler",                 href: "https://youtube.com/@DjKessler" },
+    ],
+  }
 };
 
 function applyPlujTokens() {
