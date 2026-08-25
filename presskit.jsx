@@ -189,6 +189,13 @@ function applyPreset(id) {
   saveJSON(K.creds, p.credentials);
   saveJSON(K.venues, p.venues);
   saveJSON(K.social, p.social);
+  if (p.artists) saveJSON(K.artists, p.artists);
+  if (p.rider) saveJSON(K.rider, p.rider);
+  if (p.hospitality) saveJSON(K.hospitality, p.hospitality);
+  // Las fotos también son del ejemplo: si no se reemplazan, la del preset
+  // anterior sobrevive en localStorage y pisa al nuevo.
+  saveJSON(K.images, { ...(p.images || {}), ...(p.sharedImages || {}) });
+  try { localStorage.removeItem(K.opacity); } catch {}
   try { localStorage.removeItem(K.spreads); } catch {}
   location.reload();
 }
@@ -1134,7 +1141,8 @@ function PjCover({ editing, fmt }) {
   const L = window.PLUJ_LAYOUT.cover[fmt];
   return (
     <div className="spread" style={{ background: "var(--pj-black)" }}>
-      <PjPhoto id="pj-cover-bg" editing={editing} deep style={{ position: "absolute", inset: 0, zIndex: 0 }} />
+      <PjPhoto id="pj-cover-bg" editing={editing} deep objectPosition="center 22%"
+        style={{ position: "absolute", inset: 0, zIndex: 0 }} />
 
       <div className="layer" style={{ position: "absolute", top: L.top, left: L.pad, right: L.pad, zIndex: 5,
                                       display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1462,7 +1470,8 @@ function PjContact({ editing, social, fmt }) {
   const L = window.PLUJ_LAYOUT.contact[fmt];
   return (
     <div className="spread" style={{ background: "var(--pj-black)" }}>
-      <PjPhoto id="pj-contact-bg" editing={editing} deep style={{ position: "absolute", inset: 0, zIndex: 0 }} />
+      <PjPhoto id="pj-contact-bg" editing={editing} deep objectPosition="center 25%"
+        style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       <span className="deco" style={{ position: "absolute", inset: 0, zIndex: 2,
                                       background: "linear-gradient(90deg,rgba(27,20,19,.86) 0%,rgba(27,20,19,.55) 48%,rgba(27,20,19,.15) 100%)" }} />
       <div className="layer" style={{ position: "absolute", left: L.pad, top: L.pad, right: L.pad, zIndex: 5 }}>
