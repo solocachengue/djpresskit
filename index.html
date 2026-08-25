@@ -786,6 +786,16 @@
       outline:none !important; box-shadow:none !important; background:transparent !important;
     }
     a { text-decoration:none !important; color:inherit !important; }
+
+    /* El foil se pinta con un degradado recortado al texto (background-clip).
+       Al imprimir, Chrome a veces falla ese recorte y estampa la caja entera
+       del degradado sobre el título. En papel el degradado casi no se lee, así
+       que va un cobre sólido: pierde el brillo, gana no salir roto. */
+    .ds-display.foil {
+      background:none !important; background-image:none !important;
+      -webkit-text-fill-color:var(--copper-300) !important;
+      color:var(--copper-300) !important;
+    }
   }
 </style>
 </head>
