@@ -1822,6 +1822,19 @@ function StyleModal({ open, onClose, fmtChoice, setFmtChoice, format,
           <output>{texture === "none" ? "—" : grain + "%"}</output>
         </div>
 
+        <div className="modal-section">Empezar de cero</div>
+        <p className="modal-hint" style={{ marginBottom: 14 }}>
+          Borra todo lo editado en este navegador —textos, listas, fotos subidas, color y
+          textura— y vuelve al ejemplo del template. No toca nada publicado.
+        </p>
+        <div className="deploy-row">
+          <button className="deploy-btn" onClick={() => {
+            if (!confirm("¿Borrar todo lo editado en este navegador y volver al ejemplo del template?")) return;
+            Object.values(K).forEach((k) => { try { localStorage.removeItem(k); } catch {} });
+            location.reload();
+          }}>↺ Resetear todo</button>
+        </div>
+
         <div className="modal-section">Publicar tu copia</div>
         <p className="modal-hint" style={{ marginBottom: 14 }}>
           Para publicar un kit usá <b>Descargar sitio</b> arriba y soltá ese archivo en Drop.
