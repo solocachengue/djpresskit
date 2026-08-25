@@ -1583,9 +1583,9 @@ function PresetModal({ open, onClose, currentId, social, setSocial }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <p className="modal-hint">
-          Un solo diseño — el sistema Eskay Da Real. Lo que cambiás acá es el <b>contenido</b>:
-          Eskay es el kit original, Hardwell es el mismo sistema cargado con otro artista para
-          que veas que todo es editable. Cargar un preset reemplaza los textos y las listas.
+          Estos son los ejemplos del template <b>{activeKit().label}</b> — cada template
+          trae los suyos. Lo que cambiás acá es el <b>contenido</b>: textos, listas y fotos.
+          El diseño se cambia en <b>◈ Templates</b>.
         </p>
         <div className="preset-grid">
           {Object.values(PRESETS).map((p) => (
